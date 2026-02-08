@@ -15,10 +15,14 @@ Favor simplicity and pragmatism over cleverness. Choose boring technology where 
 ### Repo Baseline (Phase 3.5 Output)
 {{ARTIFACT_03B}}
 
-### Repo Context
-{{REPO_CONTEXT}}
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application is being built on this template. Reference the template's existing capabilities and only plan/design/implement what's new or needs modification.
 
 ## Instructions
+
+You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — read source files, check existing patterns, inspect schemas, and understand the architecture firsthand. Do not guess at file contents; read them.
 
 Produce a comprehensive technical design document. Be specific enough that a developer can implement each component without architectural ambiguity.
 

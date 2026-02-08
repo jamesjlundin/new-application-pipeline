@@ -15,9 +15,16 @@ Be direct. If something is easy, say it's easy. If something is hard, say it's h
 ### Idea Intake (Phase 0 Output)
 {{ARTIFACT_00}}
 
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application is being built on this template. Reference the template's existing capabilities and only plan/design/implement what's new or needs modification.
+
 ## Instructions
 
-Produce a thorough feasibility review. Evaluate every significant requirement in the PRD against what the template codebase actually provides. Be specific — reference actual files, packages, and patterns from the repo baseline.
+You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — browse files, inspect configurations, check dependencies, and understand the existing architecture firsthand. Do not guess at file contents; read them.
+
+Produce a thorough feasibility review. Evaluate every significant requirement in the PRD against what the template codebase actually provides. Be specific — reference actual files, packages, and patterns you find in the repo.
 
 ### Required Sections
 

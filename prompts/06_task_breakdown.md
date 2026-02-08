@@ -15,10 +15,14 @@ The quality of this breakdown directly determines implementation success. Tasks 
 ### Feasibility Review (Phase 4 Output)
 {{ARTIFACT_04}}
 
-### Repo Context
-{{REPO_CONTEXT}}
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application is being built on this template. Reference the template's existing capabilities and only plan/design/implement what's new or needs modification.
 
 ## Instructions
+
+You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — check file paths, verify existing implementations, and understand the project structure firsthand. Do not guess at file contents; read them.
 
 Produce a detailed task breakdown that an engineer (or AI coding agent) can execute sequentially. Each task should be independently verifiable.
 

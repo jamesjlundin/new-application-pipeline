@@ -11,6 +11,8 @@ export interface RunConfig {
   repo_url?: string;
   default_branch: string;
   visibility: 'public' | 'private';
+  engine: 'claude' | 'codex';
+  timeout_ms?: number;
   current_phase: number;
   completed_phases: number[];
 }
@@ -26,10 +28,6 @@ const ARTIFACT_FILES: Record<number, string> = {
   6: '06_task_breakdown.md',
   8: '08_audit.md',
 };
-
-export function getArtifactFileName(phase: number): string | undefined {
-  return ARTIFACT_FILES[phase];
-}
 
 export function validateArtifactsExist(artifactsDir: string, phases: number[]): void {
   const missing: string[] = [];

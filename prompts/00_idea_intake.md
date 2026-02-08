@@ -9,6 +9,11 @@ Be thorough but concise. Extract every meaningful signal from the raw idea. Wher
 ### Raw Idea
 {{IDEA}}
 
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application will be built on this template. Factor the template's existing capabilities into your analysis — do not propose features, workflows, or requirements for functionality the template already provides.
+
 ## Instructions
 
 Analyze the raw idea above and produce a structured intake document. Cover every section below. If the raw idea doesn't provide enough information for a section, state what's unknown and list the assumptions you'd recommend making to move forward.

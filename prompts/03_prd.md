@@ -15,6 +15,11 @@ Be precise. Be complete. Be unambiguous. Every requirement should be testable â€
 ### User Workflows (Phase 2 Output)
 {{ARTIFACT_02}}
 
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application will be built on this template. Factor the template's existing capabilities into your analysis â€” do not propose features, workflows, or requirements for functionality the template already provides.
+
 ## Instructions
 
 Produce a comprehensive PRD covering every section below. This document must be specific enough that an engineering team could build the product with no additional product guidance.

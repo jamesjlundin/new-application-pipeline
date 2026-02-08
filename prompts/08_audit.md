@@ -21,10 +21,14 @@ Be thorough and honest. If something is incomplete, say so. If something is wron
 ### Test Results
 {{TEST_RESULTS}}
 
-### Repo Context
-{{REPO_CONTEXT}}
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application is being built on this template. Reference the template's existing capabilities and only plan/design/implement what's new or needs modification.
 
 ## Instructions
+
+You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — inspect the implementation, check for issues, verify test coverage, and validate against requirements firsthand. Do not guess at file contents; read them.
 
 Conduct a comprehensive audit of the implementation. Evaluate every dimension below and produce a detailed report.
 

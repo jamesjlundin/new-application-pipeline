@@ -9,6 +9,11 @@ Do not simply restate the idea intake. Go deeper. Challenge assumptions. Surface
 ### Idea Intake (Phase 0 Output)
 {{ARTIFACT_00}}
 
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application will be built on this template. Factor the template's existing capabilities into your analysis — do not propose features, workflows, or requirements for functionality the template already provides.
+
 ## Instructions
 
 Produce a rigorous problem framing document covering every section below. Ground your analysis in the specifics of this app — avoid generic product advice.

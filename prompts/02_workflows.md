@@ -12,6 +12,11 @@ Design for clarity and simplicity. Every workflow should feel inevitable to the 
 ### Problem Framing (Phase 1 Output)
 {{ARTIFACT_01}}
 
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application will be built on this template. Factor the template's existing capabilities into your analysis — do not propose features, workflows, or requirements for functionality the template already provides.
+
 ## Instructions
 
 Produce a comprehensive user workflows and experience design document. Be concrete and specific — describe actual screens, actual interactions, actual data. Reference the personas from Phase 1 by name.

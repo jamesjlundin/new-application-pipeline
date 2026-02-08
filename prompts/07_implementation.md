@@ -15,8 +15,10 @@ Write code that is clear, correct, and minimal. Follow the conventions already e
 ### Task Breakdown (Phase 6 Output)
 {{ARTIFACT_06}}
 
-### Repo Context
-{{REPO_CONTEXT}}
+## Template Repository Context
+{{TEMPLATE_CONTEXT}}
+
+> **Important**: The application is being built on this template. Reference the template's existing capabilities and only plan/design/implement what's new or needs modification.
 
 ## Instructions
 

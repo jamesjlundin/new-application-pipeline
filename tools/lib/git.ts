@@ -72,27 +72,3 @@ export function gitDiffStat(workspacePath: string): string {
   }
 }
 
-export function gitDiffFull(workspacePath: string): string {
-  try {
-    const diff = execSync('git diff HEAD', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    return diff.trim() || '(no changes)';
-  } catch {
-    return '(failed to get git diff)';
-  }
-}
-
-export function gitLog(workspacePath: string, count: number = 10): string {
-  try {
-    const log = execSync(`git log --oneline -${count}`, {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return log.trim();
-  } catch {
-    return '(no git history)';
-  }
-}

@@ -2,18 +2,15 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as readline from 'readline';
-import { runClaude, buildPrompt } from './lib/claude';
-import { bootstrapRepo, gitStatusCheckpoint, gitDiffStat, gitDiffFull } from './lib/git';
-import { summarizeRepoBaseline, getRepoContext } from './lib/workspace';
+import { runAgent, buildPrompt, Engine } from './lib/claude';
+import { bootstrapRepo, gitStatusCheckpoint, gitDiffStat } from './lib/git';
+import { summarizeRepoBaseline } from './lib/workspace';
 import {
   RunConfig,
-  validateConfig,
   validateArtifactsExist,
   loadConfig,
   saveConfig,
   readArtifact,
-  getArtifactFileName,
 } from './lib/validate';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +58,9 @@ interface CLIArgs {
   owner?: string;
   template?: string;
   visibility?: 'public' | 'private';
+  repoName?: string;
+  engine?: Engine;
+  timeoutMs?: number;
 }
 
 function parseArgs(): CLIArgs {
@@ -83,6 +83,15 @@ function parseArgs(): CLIArgs {
         break;
       case '--visibility':
         result.visibility = args[++i] as 'public' | 'private';
+        break;
+      case '--repo-name':
+        result.repoName = args[++i];
+        break;
+      case '--engine':
+        result.engine = args[++i] as Engine;
+        break;
+      case '--timeout':
+        result.timeoutMs = parseInt(args[++i], 10) * 60 * 1000; // input in minutes
         break;
       case '--help':
         printUsage();
@@ -108,10 +117,15 @@ Options:
   --owner <github-user>    GitHub owner for new repo (default: auto-detect)
   --template <owner/repo>  Template repo (default: ${DEFAULT_TEMPLATE})
   --visibility <pub|priv>  Repo visibility (default: ${DEFAULT_VISIBILITY})
+  --repo-name <name>       Explicit repo name (default: slugified from idea)
+  --engine <claude|codex>  AI engine to use (default: claude)
+  --timeout <minutes>      Timeout per phase in minutes (default: no timeout)
   --help                   Show this help message
 
 Examples:
   npx ts-node tools/run-pipeline.ts "A task management app for remote teams"
+  npx ts-node tools/run-pipeline.ts --repo-name my-task-app "A task management app for remote teams"
+  npx ts-node tools/run-pipeline.ts --engine codex "A task management app for remote teams"
   npx ts-node tools/run-pipeline.ts --resume runs/2026-02-07_task-manager
   npx ts-node tools/run-pipeline.ts --resume runs/2026-02-07_task-manager --from-phase 4
 `);
@@ -145,19 +159,6 @@ function appendLog(runDir: string, message: string): void {
   fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${message}\n`);
 }
 
-async function prompt(question: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
-  });
-}
-
 function getGitHubOwner(): string {
   try {
     const { execSync } = require('child_process');
@@ -174,16 +175,26 @@ function getGitHubOwner(): string {
 // Phase Execution
 // ---------------------------------------------------------------------------
 
+function loadTemplateContext(): string {
+  const templateContextPath = path.join(PROMPTS_DIR, 'template_context.md');
+  if (fs.existsSync(templateContextPath)) {
+    return fs.readFileSync(templateContextPath, 'utf-8');
+  }
+  return '(no template context available)';
+}
+
 function gatherReplacements(
   config: RunConfig,
   phase: PhaseDefinition,
-  artifactsDir: string,
-  workspacePath?: string
+  artifactsDir: string
 ): Record<string, string> {
   const replacements: Record<string, string> = {};
 
   // Raw idea
   replacements['IDEA'] = config.idea;
+
+  // Template context — injected into every phase so the model knows what already exists
+  replacements['TEMPLATE_CONTEXT'] = loadTemplateContext();
 
   // Previous artifacts
   const artifactMap: Record<string, number> = {
@@ -205,17 +216,12 @@ function gatherReplacements(
     }
   }
 
-  // Repo context
-  if (phase.needsRepo && workspacePath && fs.existsSync(workspacePath)) {
-    replacements['REPO_CONTEXT'] = getRepoContext(workspacePath);
-    replacements['REPO_TREE'] = require('./lib/workspace').getFileTree(workspacePath);
-
-    // Git data
-    replacements['GIT_DIFF'] = gitDiffStat(workspacePath);
+  // For repo-dependent phases, Claude runs in the repo and can read files itself.
+  // We just provide git status data that's useful for the audit phase.
+  if (phase.needsRepo && config.workspace_path && fs.existsSync(config.workspace_path)) {
+    replacements['GIT_DIFF'] = gitDiffStat(config.workspace_path);
     replacements['TEST_RESULTS'] = '(run tests manually or integrate test runner)';
   } else {
-    replacements['REPO_CONTEXT'] = '(repo not yet created)';
-    replacements['REPO_TREE'] = '(repo not yet created)';
     replacements['GIT_DIFF'] = '(no changes yet)';
     replacements['TEST_RESULTS'] = '(no tests run yet)';
   }
@@ -225,6 +231,8 @@ function gatherReplacements(
 
   return replacements;
 }
+
+const READ_ONLY_TOOLS = ['Read', 'Glob', 'Grep'];
 
 function runArtifactPhase(
   phase: PhaseDefinition,
@@ -243,12 +251,23 @@ function runArtifactPhase(
     throw new Error(`Prompt template not found: ${promptPath}`);
   }
 
-  const replacements = gatherReplacements(config, phase, artifactsDir, config.workspace_path);
+  const replacements = gatherReplacements(config, phase, artifactsDir);
   const fullPrompt = buildPrompt(promptPath, replacements);
 
-  // Run Claude
-  log(phase.name, 'Calling Claude...');
-  const result = runClaude(fullPrompt);
+  // For repo-dependent phases, run in the workspace with read tools
+  // so the model can explore the codebase itself instead of getting a bloated prompt
+  const useRepo = phase.needsRepo && config.workspace_path && fs.existsSync(config.workspace_path);
+
+  log(phase.name, `Calling ${config.engine}...${useRepo ? ` (running in ${config.workspace_path})` : ''}`);
+  const result = runAgent(fullPrompt, {
+    engine: config.engine,
+    timeoutMs: config.timeout_ms,
+    ...(useRepo ? {
+      cwd: config.workspace_path,
+      allowedTools: READ_ONLY_TOOLS,
+      maxTurns: 15,
+    } : {}),
+  });
 
   // Save artifact
   if (phase.artifactFile) {
@@ -356,16 +375,18 @@ function runImplementation(config: RunConfig, artifactsDir: string): void {
     log(phase.name, `Implementing task ${i + 1}/${tasks.length}: ${task.title}`);
 
     const promptPath = path.join(PROMPTS_DIR, phase.promptFile!);
-    const replacements = gatherReplacements(config, phase, artifactsDir, config.workspace_path);
+    const replacements = gatherReplacements(config, phase, artifactsDir);
     replacements['TASK'] = task.body;
 
     const fullPrompt = buildPrompt(promptPath, replacements);
 
-    // Run Claude in the workspace directory with edit permissions
-    runClaude(fullPrompt, {
+    // Run AI agent in the workspace directory with edit permissions
+    runAgent(fullPrompt, {
       cwd: config.workspace_path,
       maxTurns: 20,
       allowedTools: ['Edit', 'Write', 'Bash', 'Read', 'Glob', 'Grep'],
+      engine: config.engine,
+      timeoutMs: config.timeout_ms,
     });
 
     // Record status after each task
@@ -426,10 +447,13 @@ async function main(): Promise<void> {
     config = {
       run_id: runId,
       idea: args.idea,
+      repo_name: args.repoName,
       repo_owner: owner,
       template_repo: args.template || DEFAULT_TEMPLATE,
       default_branch: DEFAULT_BRANCH,
       visibility: args.visibility || DEFAULT_VISIBILITY,
+      engine: args.engine || 'claude',
+      timeout_ms: args.timeoutMs,
       current_phase: -1,
       completed_phases: [],
     };
