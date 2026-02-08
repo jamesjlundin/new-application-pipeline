@@ -16,6 +16,8 @@ Be thorough but concise. Extract every meaningful signal from the raw idea. Wher
 
 ## Instructions
 
+**Research first.** Before writing, use web search to research any aspects of this idea you're not deeply familiar with. This includes: the problem domain, existing products in the space, target user demographics, relevant technologies or services mentioned, and industry-specific terminology. The person submitting this idea may be referencing specific tools, markets, or workflows that you lack training data on — look them up. Ground your analysis in current, real-world information.
+
 Analyze the raw idea above and produce a structured intake document. Cover every section below. If the raw idea doesn't provide enough information for a section, state what's unknown and list the assumptions you'd recommend making to move forward.
 
 ### Required Sections
@@ -48,6 +50,14 @@ List any hard constraints mentioned or implied:
 - Timeline constraints
 - Integration requirements (APIs, services, data sources)
 
+**6b. Security & Privacy Considerations**
+Identify security and privacy requirements implied by this app:
+- What sensitive data will the app handle? (PII, financial, health, etc.)
+- What authentication/authorization model is needed?
+- Are there compliance requirements? (GDPR, HIPAA, SOC 2, PCI-DSS)
+- What are the main attack surfaces?
+- Data encryption requirements (at rest, in transit)
+
 **7. Out of Scope**
 Explicitly list things this app should NOT do in its initial version. This prevents scope creep downstream.
 
@@ -66,3 +76,13 @@ List any existing products that solve similar problems or have UX patterns worth
 ## Output Format
 
 Produce the document in clean Markdown with the sections above as H2 headers. Use bullet points for lists. Be precise and specific — avoid filler language.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

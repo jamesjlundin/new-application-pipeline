@@ -22,6 +22,8 @@ Be precise. Be complete. Be unambiguous. Every requirement should be testable â€
 
 ## Instructions
 
+**Verify integrations and services.** Use web search to verify any third-party services, APIs, or integrations referenced in the prior artifacts. Confirm they exist, check their current capabilities and pricing, and note any constraints (rate limits, required plans, regional availability). If a prior phase assumed a service that doesn't exist or works differently than described, flag it and recommend alternatives.
+
 Produce a comprehensive PRD covering every section below. This document must be specific enough that an engineering team could build the product with no additional product guidance.
 
 ### Required Sections
@@ -110,3 +112,13 @@ Define domain-specific terms used in this document.
 ## Output Format
 
 Produce the document in clean Markdown. Use tables for user stories and functional requirements. Use H2 for major sections, H3 for subsections. Every requirement must have a clear ID for traceability. The document should be complete enough to hand to an engineering team as-is.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

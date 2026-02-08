@@ -22,7 +22,7 @@ Favor simplicity and pragmatism over cleverness. Choose boring technology where 
 
 ## Instructions
 
-You are running inside the repository with Read, Glob, and Grep tools. Be strategic with your exploration — you have limited turns, so do NOT read files aimlessly. Follow this approach:
+You are running inside the repository with Read, Glob, Grep, WebSearch, and WebFetch tools. Be strategic with your exploration — you have limited turns, so do NOT read files aimlessly. Follow this approach:
 
 1. **Targeted reads only (3-5 turns max)**: You already have the Repo Baseline, Feasibility Review, and Template Context. Only read files to answer specific design questions:
    - Database schema files → to understand existing tables and design new ones alongside them
@@ -30,6 +30,8 @@ You are running inside the repository with Read, Glob, and Grep tools. Be strate
    - Component files → to match existing frontend patterns
    - Auth/middleware files → only if the PRD requires auth modifications
 2. **Write your spec (remaining turns)**: Start producing the technical design. Reference file paths from the Repo Baseline and Feasibility Review — you don't need to re-read files that were already analyzed.
+
+**Web research**: Use WebSearch to verify package documentation, API references, and current best practices for any technologies you're specifying in the design. If you're recommending a new library or integration, confirm its API surface matches what you're designing against.
 
 **Do NOT**: Re-read files already summarized in the Feasibility Review. Do NOT broadly explore the codebase — the previous phases already did that. Focus your reads on implementation-specific details the Feasibility Review didn't cover.
 
@@ -166,3 +168,13 @@ Organize by:
 ## Output Format
 
 Produce the document in clean Markdown. Use code blocks for schemas, API examples, and file paths. Use tables for field definitions and API endpoint summaries. Reference actual repo paths throughout. The document should be implementable as-is.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

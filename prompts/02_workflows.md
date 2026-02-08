@@ -19,6 +19,8 @@ Design for clarity and simplicity. Every workflow should feel inevitable to the 
 
 ## Instructions
 
+**Research UX conventions.** If this application involves domain-specific workflows, industry-standard interfaces, or interaction patterns you're uncertain about, use web search to research how leading products in this space handle them. Understanding real-world UX conventions ensures your designs feel familiar and intuitive to the target users.
+
 Produce a comprehensive user workflows and experience design document. Be concrete and specific — describe actual screens, actual interactions, actual data. Reference the personas from Phase 1 by name.
 
 ### Required Sections
@@ -73,6 +75,9 @@ For each primary flow, document:
 - What happens on slow connections
 - What happens when two users modify the same data
 - Session expiry / authentication edge cases
+- Authentication edge cases (expired tokens, concurrent sessions, account lockout)
+- Authorization boundaries (what happens when a user tries to access another user's data)
+- Rate limiting behavior (what the user sees when rate limited)
 
 **6. Responsive & Multi-Platform Considerations**
 - How do layouts adapt between mobile, tablet, and desktop?
@@ -98,3 +103,13 @@ At a conceptual level (not code-level), describe:
 ## Output Format
 
 Produce the document in clean Markdown. Use numbered steps for flows. Use tables for screen inventories. Use bullet points for interaction patterns. Be specific enough that an engineer could build from this without needing to ask clarifying UX questions.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

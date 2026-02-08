@@ -4,11 +4,15 @@
   "description": "Artifact-driven pipeline for building new applications using Claude Code",
   "main": "tools/run-pipeline.ts",
   "scripts": {
-    "pipeline": "ts-node tools/run-pipeline.ts"
+    "pipeline": "ts-node tools/run-pipeline.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit --strict"
   },
   "dependencies": {
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.3",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
     "@types/node": "^22.12.0"
   }
 }

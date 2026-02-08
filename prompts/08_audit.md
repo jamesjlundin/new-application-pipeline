@@ -103,6 +103,12 @@ Check for common vulnerabilities:
 - [ ] Dependency vulnerabilities (known CVEs)
 - [ ] File upload security (if applicable)
 - [ ] Rate limiting on sensitive endpoints
+- [ ] SSRF prevention (no user-controlled URLs in server-side requests without validation)
+- [ ] Cryptographic practices (proper TLS, no weak algorithms, secure random generation)
+- [ ] Content Security Policy headers configured
+- [ ] Security headers set (X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security)
+- [ ] No sensitive data in logs or error messages
+- [ ] Threat model documented for critical flows
 
 **6. Performance Review**
 Check for common performance issues:
@@ -156,3 +162,13 @@ Categorize all findings:
 ## Output Format
 
 Produce the document in clean Markdown. Use checkboxes for checklists. Use tables for requirement coverage. Be specific — reference file paths, line numbers, and exact issues. Every finding should include a recommended action.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

@@ -15,6 +15,9 @@ Write code that is clear, correct, and minimal. Follow the conventions already e
 ### Task Breakdown (Phase 6 Output)
 {{ARTIFACT_06}}
 
+### PRD (Phase 3 Output)
+{{ARTIFACT_03}}
+
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
 

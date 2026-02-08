@@ -83,6 +83,42 @@ For each task, provide ALL of the following:
 [Any specific guidance, gotchas, or patterns to follow — reference the tech spec]
 ```
 
+**Example of a well-written task:**
+
+```
+### Task M1-3: Add league schema and migration
+
+**Priority**: P0
+**Complexity**: Medium
+**Milestone**: M1 - Foundation
+
+**Description**:
+Create the Drizzle schema for the leagues table and generate the corresponding migration. The schema should support the league entity defined in the tech spec section 2, including relationships to users via a league_members junction table.
+
+**Target Files**:
+- `packages/db/src/schema/leagues.ts` — new file, league and league_members schema
+- `packages/db/src/schema/index.ts` — export new schema
+- `packages/db/drizzle/migrations/` — generated migration file
+
+**Acceptance Criteria**:
+- [ ] leagues table has columns: id, name, slug, description, commissioner_id, settings (jsonb), created_at, updated_at
+- [ ] league_members junction table has columns: league_id, user_id, role (enum: commissioner, manager, member), joined_at
+- [ ] Foreign keys reference users table with ON DELETE CASCADE
+- [ ] Unique constraint on league slug
+- [ ] Migration generates and applies cleanly on fresh DB
+
+**Test Expectations**:
+- Migration applies without errors on empty database
+- Schema types are exported and usable in API code
+
+**Dependencies**:
+- Depends on: M1-1 (base schema setup)
+- Blocks: M2-1 (league CRUD API)
+
+**Implementation Notes**:
+Follow the pattern in `packages/db/src/schema/users.ts` for table definition style. Use `pgTable` from drizzle-orm/pg-core. The settings jsonb column should use `.$type<LeagueSettings>()` for type safety.
+```
+
 **3. Dependency Graph**
 Provide a textual representation of task dependencies:
 - Which tasks can be done in parallel
@@ -108,6 +144,38 @@ Conditions that must be true for the entire implementation to be considered comp
 - App builds and deploys successfully
 - Core user flows work end-to-end
 
+**6. Machine-Readable Task Manifest**
+After the human-readable markdown sections, include a machine-readable JSON manifest in a fenced code block with language tag `task-manifest`.
+
+Schema:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "M1-1",
+      "title": "Task title",
+      "priority": "P0",
+      "complexity": "Medium",
+      "milestone": "M1 - Foundation",
+      "description": "2-4 sentence description",
+      "targetFiles": ["path/to/file.ts"],
+      "acceptanceCriteria": ["criterion 1", "criterion 2"],
+      "testExpectations": ["test expectation"],
+      "dependencies": "Depends on: M1-0 | Blocks: M1-2",
+      "implementationNotes": "Specific implementation notes",
+      "markdown": "### Task M1-1: Task title\\n\\n...full markdown task body..."
+    }
+  ]
+}
+```
+
+Rules:
+- `tasks` must include every task in the same order as the markdown section.
+- `id` values must be unique.
+- `markdown` should contain the full markdown block for the task, starting at `### Task ...`.
+- JSON must be valid (no trailing commas or comments).
+
 ## Task Design Guidelines
 
 Follow these principles when designing tasks:
@@ -127,3 +195,14 @@ Follow these principles when designing tasks:
 ## Output Format
 
 Produce the document in clean Markdown. Use the task template format shown above consistently for every task. Number tasks within milestones (e.g., M1-1, M1-2, M2-1). Include the dependency graph as an ASCII diagram or structured list.
+End the document with the required `task-manifest` fenced code block containing the JSON manifest.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.

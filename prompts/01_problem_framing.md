@@ -16,6 +16,8 @@ Do not simply restate the idea intake. Go deeper. Challenge assumptions. Surface
 
 ## Instructions
 
+**Research the landscape.** Use web search to research the competitive landscape, market dynamics, and user behaviors relevant to this problem space. Look up actual competitors — their features, pricing, user reviews, and market positioning. If the idea references a specific industry, niche, or domain, search for current information about it. Your analysis of alternatives and market risks should be grounded in real, current data, not general assumptions.
+
 Produce a rigorous problem framing document covering every section below. Ground your analysis in the specifics of this app — avoid generic product advice.
 
 ### Required Sections
@@ -71,6 +73,7 @@ Identify risks across these categories:
 - **Usability risk**: Can users figure it out?
 - **Technical risk**: Can we build it reliably?
 - **Business risk**: Can this sustain itself?
+- **Security risk**: What are the key threat vectors? What data needs protection? What compliance requirements apply?
 For each risk, rate likelihood and impact, and suggest a mitigation strategy.
 
 **8. Jobs To Be Done**
@@ -87,3 +90,13 @@ Based on your analysis, recommend:
 ## Output Format
 
 Produce the document in clean Markdown with the sections above as H2 headers. Use tables where they improve clarity. Be specific to this app — every insight should reference the actual problem domain, not generic product advice.
+
+## Critical Output Rules
+
+Output ONLY the document content in Markdown. Do NOT include:
+- Preamble like "Here is the document..." or "I'll create..."
+- Requests for permissions or tool access
+- Meta-commentary about your process
+- Closing remarks like "Let me know if..."
+
+Start your output with the first heading of the document. End with the last section. Nothing else.
