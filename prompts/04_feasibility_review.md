@@ -22,7 +22,17 @@ Be direct. If something is easy, say it's easy. If something is hard, say it's h
 
 ## Instructions
 
-You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — browse files, inspect configurations, check dependencies, and understand the existing architecture firsthand. Do not guess at file contents; read them.
+You are running inside the repository with Read, Glob, and Grep tools. Be strategic with your exploration — you have limited turns, so do NOT read files aimlessly. Follow this approach:
+
+1. **Quick structural scan (1 turn)**: Use `Glob` with `**/*.ts` or similar to understand the top-level directory layout. Do NOT recursively read every file.
+2. **Targeted reads based on PRD requirements (2-4 turns)**: For each major PRD requirement, read ONLY the specific files that determine feasibility:
+   - Database schema → look for `schema.ts`, `*.schema.ts`, or `prisma/schema.prisma`
+   - Auth → look for auth config/middleware files
+   - API routes → check the route structure under `apps/web/app/api/` or similar
+   - Dependencies → read the root `package.json` and relevant workspace `package.json` files
+3. **Write your analysis (remaining turns)**: Start writing the artifact. You already have the Repo Baseline and Template Context — use those as your primary reference and only read files to verify specific claims.
+
+**Do NOT**: Read README files you already have in the baseline. Do NOT read test files, config files, or boilerplate unless a specific PRD requirement depends on them. Do NOT explore "just to understand" — be goal-directed.
 
 Produce a thorough feasibility review. Evaluate every significant requirement in the PRD against what the template codebase actually provides. Be specific — reference actual files, packages, and patterns you find in the repo.
 

@@ -22,7 +22,16 @@ Favor simplicity and pragmatism over cleverness. Choose boring technology where 
 
 ## Instructions
 
-You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — read source files, check existing patterns, inspect schemas, and understand the architecture firsthand. Do not guess at file contents; read them.
+You are running inside the repository with Read, Glob, and Grep tools. Be strategic with your exploration — you have limited turns, so do NOT read files aimlessly. Follow this approach:
+
+1. **Targeted reads only (3-5 turns max)**: You already have the Repo Baseline, Feasibility Review, and Template Context. Only read files to answer specific design questions:
+   - Database schema files → to understand existing tables and design new ones alongside them
+   - Existing API route files → to follow the established patterns for new endpoints
+   - Component files → to match existing frontend patterns
+   - Auth/middleware files → only if the PRD requires auth modifications
+2. **Write your spec (remaining turns)**: Start producing the technical design. Reference file paths from the Repo Baseline and Feasibility Review — you don't need to re-read files that were already analyzed.
+
+**Do NOT**: Re-read files already summarized in the Feasibility Review. Do NOT broadly explore the codebase — the previous phases already did that. Focus your reads on implementation-specific details the Feasibility Review didn't cover.
 
 Produce a comprehensive technical design document. Be specific enough that a developer can implement each component without architectural ambiguity.
 

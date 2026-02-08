@@ -28,7 +28,13 @@ Be thorough and honest. If something is incomplete, say so. If something is wron
 
 ## Instructions
 
-You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — inspect the implementation, check for issues, verify test coverage, and validate against requirements firsthand. Do not guess at file contents; read them.
+You are running inside the repository with Read, Glob, and Grep tools. Be strategic with your exploration — you have limited turns. Follow this approach:
+
+1. **Check what was actually implemented (2-3 turns)**: Use `Grep` to search for key functions, endpoints, or components that the Task Breakdown specified. Use `Glob` to verify new files exist at expected paths.
+2. **Spot-check critical code (2-3 turns)**: Read the most important new files — API routes handling user data, auth modifications, database schema changes. Focus on security-sensitive and business-critical code.
+3. **Write the audit (remaining turns)**: Produce the report. Use the Git Changes Summary and Task Breakdown to guide your assessment — you don't need to read every file that changed.
+
+**Do NOT**: Read every file in the repo. Do NOT re-read template files that weren't modified. Focus on files that were created or changed during implementation.
 
 Conduct a comprehensive audit of the implementation. Evaluate every dimension below and produce a detailed report.
 

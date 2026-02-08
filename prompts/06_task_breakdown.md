@@ -22,7 +22,12 @@ The quality of this breakdown directly determines implementation success. Tasks 
 
 ## Instructions
 
-You are running inside the repository. Use your Read, Glob, and Grep tools to explore the codebase directly — check file paths, verify existing implementations, and understand the project structure firsthand. Do not guess at file contents; read them.
+You are running inside the repository with Read, Glob, and Grep tools. Be strategic — you have limited turns. The Tech Spec and Feasibility Review already contain detailed analysis of the codebase. Only read files to:
+
+1. **Verify specific file paths (1-2 turns max)**: Use `Glob` to confirm that files referenced in the Tech Spec actually exist at those paths before assigning them to tasks.
+2. **Write the task breakdown (remaining turns)**: Produce the breakdown. You have extensive context from previous phases — use it.
+
+**Do NOT**: Re-explore the codebase. Do NOT read file contents unless you need to verify something specific for a task's acceptance criteria. The Tech Spec already analyzed the architecture.
 
 Produce a detailed task breakdown that an engineer (or AI coding agent) can execute sequentially. Each task should be independently verifiable.
 
