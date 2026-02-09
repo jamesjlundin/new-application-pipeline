@@ -15,6 +15,9 @@ Be thorough and honest. If something is incomplete, say so. If something is wron
 ### Task Breakdown (Phase 6 Output)
 {{ARTIFACT_06}}
 
+### Design & Theme Direction (Phase 2.5 Output)
+{{ARTIFACT_025}}
+
 ### Git Changes Summary
 {{GIT_DIFF}}
 
@@ -65,6 +68,7 @@ Areas to check:
 - Data model matches spec
 - API endpoints match spec
 - Component architecture matches spec
+- Theme token and component styling implementation matches the design/theme artifact
 - Auth implementation matches spec
 - Error handling matches spec
 

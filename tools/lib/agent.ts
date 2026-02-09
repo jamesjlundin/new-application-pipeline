@@ -71,7 +71,13 @@ function getCodexCapabilities(): CodexCapabilities {
 
 function buildClaudeArgs(options: AgentOptions): { cmd: string; args: string[] } {
   const { maxTurns, permissions, webSearch } = options;
-  const args: string[] = ['-p', '--output-format', 'stream-json', '--verbose'];
+  const args: string[] = [
+    '-p',
+    '--output-format',
+    'stream-json',
+    '--include-partial-messages',
+    '--verbose',
+  ];
 
   if (maxTurns) args.push('--max-turns', String(maxTurns));
 
@@ -265,13 +271,27 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     // Claude stream-json parser
     // Events: system, assistant, user, result
     // ---------------------------------------------------------------
+    function appendClaudeText(text) {
+      if (!text) return;
+
+      // Avoid duplicating snapshot-style partial payloads.
+      if (accumulatedText.length === 0) {
+        accumulatedText = text;
+      } else if (text.includes(accumulatedText)) {
+        accumulatedText = text;
+      } else if (!accumulatedText.endsWith(text)) {
+        accumulatedText += text;
+      }
+
+      state.textBytes = Buffer.byteLength(accumulatedText);
+    }
+
     function parseClaude(event) {
       if (event.type === 'assistant' && event.message && event.message.content) {
         let hasTool = false;
         for (const block of event.message.content) {
           if (block.type === 'text') {
-            accumulatedText += block.text;
-            state.textBytes += Buffer.byteLength(block.text);
+            appendClaudeText(block.text || '');
           }
           if (block.type === 'tool_use') {
             hasTool = true;
@@ -398,7 +418,12 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
       if (lineBuffer.trim()) processChunk(lineBuffer + '\\n');
 
       // Determine final output: prefer result event, fall back to accumulated text
-      const output = state.finalText || accumulatedText;
+      let output = state.finalText || accumulatedText;
+      if (ENGINE === 'claude') {
+        if (accumulatedText.length > output.length) {
+          output = accumulatedText;
+        }
+      }
       process.stdout.write(output);
 
       // Log completion summary to stderr

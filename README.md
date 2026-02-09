@@ -196,7 +196,7 @@ npx ts-node tools/run-pipeline.ts \
 
 ## How It Works
 
-The pipeline runs through 9 phases sequentially. Each phase produces a Markdown artifact that feeds into subsequent phases.
+The pipeline runs through 12 phases sequentially. Each phase produces a Markdown artifact that feeds into subsequent phases.
 
 ### Pipeline Phases
 
@@ -205,6 +205,7 @@ The pipeline runs through 9 phases sequentially. Each phase produces a Markdown 
 | 0 | Idea Intake | Structures the raw idea into a formal intake document |
 | 1 | Problem Framing | Deep analysis of the problem space, user personas, and competitive landscape |
 | 2 | Workflows | User flows, screen inventory, interaction patterns, and information architecture |
+| 2.5 | Design & Theme | Defines visual direction, color/typography systems, and implementable theme tokens |
 | 3 | PRD | Full product requirements document with user stories and acceptance criteria |
 | 3.5 | Repo Bootstrap | Creates a GitHub repo from the template, clones it, and captures a baseline snapshot |
 | 4 | Feasibility Review | AI explores the repo and assesses what the template provides vs. what must be built |
@@ -214,7 +215,7 @@ The pipeline runs through 9 phases sequentially. Each phase produces a Markdown 
 | 7.5 | Test & Verify | Installs dependencies, runs typecheck/lint/build/tests, and auto-attempts repair if checks fail |
 | 8 | Audit | Validates the implementation against the PRD, tech spec, and quality standards |
 
-**Phases 0-3** are artifact generation phases — the AI runs with read-only permissions and produces the next artifact from prior outputs (with web research enabled for grounding).
+**Phases 0-3 (including phase 2.5)** are artifact generation phases — the AI runs with read-only permissions and produces the next artifact from prior outputs (with web research enabled for grounding).
 
 **Phase 3.5** is deterministic — it uses `gh` to create the repo and captures the file tree and config files.
 
@@ -242,6 +243,7 @@ new-application-pipeline/
     00_idea_intake.md
     01_problem_framing.md
     02_workflows.md
+    02b_design_theme.md
     03_prd.md
     04_feasibility_review.md
     05_tech_spec.md
@@ -381,7 +383,7 @@ Available placeholders:
 |---|---|
 | `{{IDEA}}` | The raw idea text |
 | `{{TEMPLATE_CONTEXT}}` | Contents of `prompts/template_context.md` |
-| `{{ARTIFACT_00}}` through `{{ARTIFACT_06}}` | Output from the corresponding phase |
+| `{{ARTIFACT_00}}`, `{{ARTIFACT_01}}`, `{{ARTIFACT_02}}`, `{{ARTIFACT_025}}`, `{{ARTIFACT_03}}` through `{{ARTIFACT_06}}` | Output from the corresponding phase |
 | `{{ARTIFACT_03B}}` | Repo baseline snapshot from phase 3.5 |
 | `{{ARTIFACT_07B}}` | Test and verification results from phase 7.5 |
 | `{{GIT_DIFF}}` | Git diff stats from the workspace |

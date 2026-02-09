@@ -15,6 +15,9 @@ The quality of this breakdown directly determines implementation success. Tasks 
 ### Feasibility Review (Phase 4 Output)
 {{ARTIFACT_04}}
 
+### Design & Theme Direction (Phase 2.5 Output)
+{{ARTIFACT_025}}
+
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
 
@@ -191,6 +194,8 @@ Follow these principles when designing tasks:
 5. **Context-minimal**: Each task should include enough context that someone can implement it without reading the entire tech spec. Reference specific sections of the tech spec where needed.
 
 6. **File-grounded**: Every task must reference specific file paths in the actual repo. No abstract "implement the auth system" — instead "add JWT middleware to `apps/api/src/middleware/auth.ts`".
+
+7. **Theme-first UI foundation**: If the product has custom UI surfaces, include early tasks to implement the agreed theme tokens and shared styling primitives before feature-specific UI tasks.
 
 ## Output Format
 

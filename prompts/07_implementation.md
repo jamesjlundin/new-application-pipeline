@@ -18,6 +18,9 @@ Write code that is clear, correct, and minimal. Follow the conventions already e
 ### PRD (Phase 3 Output)
 {{ARTIFACT_03}}
 
+### Design & Theme Direction (Phase 2.5 Output)
+{{ARTIFACT_025}}
+
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
 
@@ -86,6 +89,7 @@ Before considering the task complete:
 - Handle loading, error, and empty states
 - Ensure responsive behavior if the app supports mobile
 - Use existing UI components before creating new ones
+- Apply the design/theme artifact consistently (tokens, typography, component states) instead of default template styling
 
 **Git Practices**:
 - Make one commit per logical unit of work

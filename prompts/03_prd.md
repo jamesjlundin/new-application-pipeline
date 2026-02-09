@@ -15,6 +15,9 @@ Be precise. Be complete. Be unambiguous. Every requirement should be testable â€
 ### User Workflows (Phase 2 Output)
 {{ARTIFACT_02}}
 
+### Design & Theme Direction (Phase 2.5 Output)
+{{ARTIFACT_025}}
+
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
 
@@ -64,6 +67,7 @@ Specify requirements across these dimensions:
 - **Reliability**: Uptime target, failure recovery, data durability
 - **Security**: Authentication, authorization, data encryption, compliance
 - **Usability**: Accessibility standards (WCAG level), browser support, device support
+- **Design consistency**: Theming/token consistency requirements and visual coherence constraints from the design phase
 - **Maintainability**: Code quality standards, documentation requirements
 - **Observability**: Logging, monitoring, alerting requirements
 

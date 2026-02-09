@@ -15,6 +15,9 @@ Favor simplicity and pragmatism over cleverness. Choose boring technology where 
 ### Repo Baseline (Phase 3.5 Output)
 {{ARTIFACT_03B}}
 
+### Design & Theme Direction (Phase 2.5 Output)
+{{ARTIFACT_025}}
+
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
 
@@ -84,6 +87,7 @@ Include:
 - Shared component library usage
 - Form handling approach
 - Client-side validation strategy
+- Theme token implementation plan (how visual direction maps to actual theme files/tokens)
 
 **5. State Management**
 - Global state structure

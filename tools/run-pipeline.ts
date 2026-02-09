@@ -59,6 +59,7 @@ const PHASES: PhaseDefinition[] = [
   { id: '0', name: 'Idea Intake', promptFile: '00_idea_intake.md', needsRepo: false, artifactFile: '00_idea_intake.md', requiredPhases: [] },
   { id: '1', name: 'Problem Framing', promptFile: '01_problem_framing.md', needsRepo: false, artifactFile: '01_problem_framing.md', requiredPhases: ['0'] },
   { id: '2', name: 'Workflows', promptFile: '02_workflows.md', needsRepo: false, artifactFile: '02_workflows.md', requiredPhases: ['0', '1'] },
+  { id: '2.5', name: 'Design & Theme', promptFile: '02b_design_theme.md', needsRepo: false, artifactFile: '02b_design_theme.md', requiredPhases: ['0', '1', '2'] },
   { id: '3', name: 'PRD', promptFile: '03_prd.md', needsRepo: false, artifactFile: '03_prd.md', requiredPhases: ['0', '1', '2'] },
   { id: '3.5', name: 'Repo Bootstrap', promptFile: null, needsRepo: false, artifactFile: '03b_repo_baseline.md', requiredPhases: ['3'] },
   { id: '4', name: 'Feasibility Review', promptFile: '04_feasibility_review.md', needsRepo: true, artifactFile: '04_feasibility_review.md', requiredPhases: ['0', '3', '3.5'] },
@@ -391,6 +392,7 @@ function gatherReplacements(
     'ARTIFACT_00': '0',
     'ARTIFACT_01': '1',
     'ARTIFACT_02': '2',
+    'ARTIFACT_025': '2.5',
     'ARTIFACT_03': '3',
     'ARTIFACT_03B': '3.5',
     'ARTIFACT_04': '4',
@@ -432,7 +434,7 @@ function gatherReplacements(
 }
 
 // Phases that benefit from web research (library docs, API references, domain knowledge)
-const WEB_SEARCH_PHASES = new Set(['0', '1', '2', '3', '4', '5']);
+const WEB_SEARCH_PHASES = new Set(['0', '1', '2', '2.5', '3', '4', '5']);
 
 function shouldRepairArtifact(warnings: string[], content: string): boolean {
   if (warnings.some((warning) => warning.includes('Missing expected section'))) return true;
@@ -462,8 +464,42 @@ function buildArtifactRepairPrompt(
     '```',
     '',
     'Rewrite the entire artifact from scratch so all required sections are fully present.',
+    'Start immediately with the first H2 heading of the document.',
+    'Do not include preamble, explanation, or tool logs.',
     'Do not truncate output.',
     'Output only the final markdown document.',
+  ].join('\n');
+}
+
+function getMissingSectionWarnings(warnings: string[]): string[] {
+  const missing: string[] = [];
+  for (const warning of warnings) {
+    const match = warning.match(/Missing expected section "([^"]+)"/i);
+    if (match?.[1]) {
+      missing.push(match[1]);
+    }
+  }
+  return missing;
+}
+
+function buildMissingSectionsPrompt(
+  phase: PhaseDefinition,
+  baseDocument: string,
+  missingSections: string[]
+): string {
+  return [
+    `You are filling missing sections for phase ${phase.id}: ${phase.name}.`,
+    '',
+    'Current artifact (do not rewrite this entire document):',
+    '```markdown',
+    baseDocument,
+    '```',
+    '',
+    `Missing required sections: ${missingSections.join(', ')}`,
+    '',
+    'Output only the missing sections as H2 headings with complete content.',
+    'Do not repeat sections that already exist.',
+    'Do not include preamble or closing remarks.',
   ].join('\n');
 }
 
@@ -605,8 +641,9 @@ function runArtifactPhase(
     let warnings = validateArtifactContent(phase.id, cleaned);
 
     if (warnings.length > 0 && shouldRepairArtifact(warnings, cleaned)) {
-      for (let attempt = 1; attempt <= MAX_ARTIFACT_REPAIR_ATTEMPTS; attempt++) {
-        log(phase.name, `Attempting artifact repair (${attempt}/${MAX_ARTIFACT_REPAIR_ATTEMPTS})...`);
+      const maxRepairAttempts = config.engine === 'claude' ? 2 : MAX_ARTIFACT_REPAIR_ATTEMPTS;
+      for (let attempt = 1; attempt <= maxRepairAttempts; attempt++) {
+        log(phase.name, `Attempting artifact repair (${attempt}/${maxRepairAttempts})...`);
         checkBudget(config, opts.budgetUsd);
 
         const repairPrompt = buildArtifactRepairPrompt(phase, cleaned, warnings);
@@ -627,6 +664,29 @@ function runArtifactPhase(
           break;
         }
       }
+    }
+
+    const missingSections = getMissingSectionWarnings(warnings);
+    if (missingSections.length > 0) {
+      log(phase.name, `Backfilling missing sections: ${missingSections.join(', ')}`);
+      checkBudget(config, opts.budgetUsd);
+
+      const supplementPrompt = buildMissingSectionsPrompt(phase, cleaned, missingSections);
+      const supplementResult = retryAgent(supplementPrompt, {
+        cwd,
+        engine: config.engine,
+        timeoutMs: config.timeout_ms,
+        permissions: 'read-only',
+        webSearch: false,
+        maxTurns: phase.needsRepo ? 8 : 6,
+      }, `${phase.id}-section-backfill`, runDir);
+
+      trackCost(config, phase.id, supplementResult.costUsd);
+      const supplement = cleanArtifact(supplementResult.output);
+      if (supplement.length > 0) {
+        cleaned = `${cleaned.trim()}\n\n${supplement.trim()}\n`;
+      }
+      warnings = validateArtifactContent(phase.id, cleaned);
     }
 
     if (warnings.length > 0) {

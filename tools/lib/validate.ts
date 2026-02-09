@@ -34,6 +34,7 @@ const ARTIFACT_FILES: Record<string, string> = {
   '0': '00_idea_intake.md',
   '1': '01_problem_framing.md',
   '2': '02_workflows.md',
+  '2.5': '02b_design_theme.md',
   '3': '03_prd.md',
   '3.5': '03b_repo_baseline.md',
   '4': '04_feasibility_review.md',
@@ -43,7 +44,7 @@ const ARTIFACT_FILES: Record<string, string> = {
   '8': '08_audit.md',
 };
 
-const VALID_PHASE_IDS = new Set(['0', '1', '2', '3', '3.5', '4', '5', '6', '7', '7.5', '8']);
+const VALID_PHASE_IDS = new Set(['0', '1', '2', '2.5', '3', '3.5', '4', '5', '6', '7', '7.5', '8']);
 
 // ---------------------------------------------------------------------------
 // Artifact Validation
@@ -75,6 +76,7 @@ const REQUIRED_SECTIONS: Record<string, string[]> = {
   '0': ['App Name', 'One-Line Description', 'Problem Statement', 'Target Users', 'Core Features'],
   '1': ['Problem Decomposition', 'User Personas', 'Pain Points', 'Core Value Proposition'],
   '2': ['Information Architecture', 'Primary User Flows', 'Screen Inventory'],
+  '2.5': ['Visual Direction', 'Color System', 'Typography System', 'Theme Tokens'],
   '3': ['Executive Summary', 'User Stories', 'Functional Requirements', 'Non-Functional Requirements'],
   '4': ['Template Fit Assessment', 'Technical Risks', 'Go / No-Go'],
   '5': ['Architecture Overview', 'Data Model', 'API Design', 'Security Considerations'],
