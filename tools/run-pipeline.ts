@@ -43,6 +43,8 @@ const APPROVAL_GATES = new Set(['3', '3.5', '6']);
 
 // Context window warning threshold (tokens)
 const CONTEXT_WARNING_THRESHOLD = 80_000;
+const MAX_ARTIFACT_REPAIR_ATTEMPTS = 1;
+const MAX_TEST_REPAIR_ATTEMPTS = 2;
 
 interface PhaseDefinition {
   id: string;
@@ -432,6 +434,113 @@ function gatherReplacements(
 // Phases that benefit from web research (library docs, API references, domain knowledge)
 const WEB_SEARCH_PHASES = new Set(['0', '1', '2', '3', '4', '5']);
 
+function shouldRepairArtifact(warnings: string[], content: string): boolean {
+  if (warnings.some((warning) => warning.includes('Missing expected section'))) return true;
+  if (content.length === 8192) return true;
+  if (!content.endsWith('\n') && /[a-zA-Z0-9]$/.test(content) && !/[.!?`)]$/.test(content)) {
+    return true;
+  }
+  return false;
+}
+
+function buildArtifactRepairPrompt(
+  phase: PhaseDefinition,
+  previousOutput: string,
+  warnings: string[]
+): string {
+  return [
+    `You are repairing a markdown artifact for phase ${phase.id}: ${phase.name}.`,
+    '',
+    'The previous output did not satisfy structural checks.',
+    '',
+    'Validation warnings:',
+    ...warnings.map((warning) => `- ${warning}`),
+    '',
+    'Previous output:',
+    '```markdown',
+    previousOutput,
+    '```',
+    '',
+    'Rewrite the entire artifact from scratch so all required sections are fully present.',
+    'Do not truncate output.',
+    'Output only the final markdown document.',
+  ].join('\n');
+}
+
+interface VerificationBlock {
+  title: string;
+  result: ReturnType<typeof runWorkspaceTests>;
+}
+
+function renderVerificationArtifact(blocks: VerificationBlock[]): string {
+  const parts: string[] = ['# Phase 7.5: Test & Verification Results', ''];
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const failedChecks = block.result.checks.filter((check) => !check.success);
+    const summary = [
+      `- Overall Result: ${block.result.allPassed ? 'PASS' : 'FAIL'}`,
+      `- Passed Checks: ${block.result.checks.length - failedChecks.length}/${block.result.checks.length}`,
+      ...(failedChecks.length > 0
+        ? [`- Failed Checks: ${failedChecks.map((check) => check.name).join(', ')}`]
+        : []),
+    ].join('\n');
+
+    parts.push(`## ${block.title}`);
+    parts.push('');
+    parts.push(summary);
+    parts.push('');
+    parts.push(block.result.report);
+    parts.push('');
+
+    if (i < blocks.length - 1) {
+      parts.push('---');
+      parts.push('');
+    }
+  }
+
+  return parts.join('\n');
+}
+
+function buildTestRepairPrompt(
+  artifactsDir: string,
+  failedCheckNames: string[],
+  testArtifactContent: string
+): string {
+  const prd = readArtifact(artifactsDir, '3');
+  const techSpec = readArtifact(artifactsDir, '5');
+  const taskBreakdown = readArtifact(artifactsDir, '6');
+
+  return [
+    'You are a senior software engineer fixing a repository after automated verification failures.',
+    '',
+    'Your objective is to make the failing checks pass without changing product scope.',
+    'Do not add placeholder hacks, and do not silence failing checks.',
+    '',
+    `Failing checks: ${failedCheckNames.join(', ')}`,
+    '',
+    '## Test Results',
+    testArtifactContent,
+    '',
+    '## PRD',
+    prd,
+    '',
+    '## Tech Spec',
+    techSpec,
+    '',
+    '## Task Breakdown',
+    taskBreakdown,
+    '',
+    '## Instructions',
+    '- Read relevant files before editing.',
+    '- Make the smallest safe code changes required to pass checks.',
+    '- Install dependencies if needed by repo scripts.',
+    '- Run the failing checks locally before finishing.',
+    '- Keep code style consistent with existing repo conventions.',
+    '- Output a concise summary of changes made.',
+  ].join('\n');
+}
+
 function runArtifactPhase(
   phase: PhaseDefinition,
   config: RunConfig,
@@ -492,8 +601,33 @@ function runArtifactPhase(
 
   // Clean and validate artifact
   if (phase.artifactFile) {
-    const cleaned = cleanArtifact(result.output);
-    const warnings = validateArtifactContent(phase.id, cleaned);
+    let cleaned = cleanArtifact(result.output);
+    let warnings = validateArtifactContent(phase.id, cleaned);
+
+    if (warnings.length > 0 && shouldRepairArtifact(warnings, cleaned)) {
+      for (let attempt = 1; attempt <= MAX_ARTIFACT_REPAIR_ATTEMPTS; attempt++) {
+        log(phase.name, `Attempting artifact repair (${attempt}/${MAX_ARTIFACT_REPAIR_ATTEMPTS})...`);
+        checkBudget(config, opts.budgetUsd);
+
+        const repairPrompt = buildArtifactRepairPrompt(phase, cleaned, warnings);
+        const repairResult = retryAgent(repairPrompt, {
+          cwd,
+          engine: config.engine,
+          timeoutMs: config.timeout_ms,
+          permissions: 'read-only',
+          webSearch: false,
+          maxTurns: phase.needsRepo ? 10 : 8,
+        }, `${phase.id}-repair-${attempt}`, runDir);
+
+        trackCost(config, phase.id, repairResult.costUsd);
+        cleaned = cleanArtifact(repairResult.output);
+        warnings = validateArtifactContent(phase.id, cleaned);
+
+        if (!shouldRepairArtifact(warnings, cleaned)) {
+          break;
+        }
+      }
+    }
 
     if (warnings.length > 0) {
       log(phase.name, 'Artifact warnings:');
@@ -820,7 +954,7 @@ function runTestVerification(
   config: RunConfig,
   artifactsDir: string,
   runDir: string,
-  opts: { dryRun?: boolean }
+  opts: { dryRun?: boolean; budgetUsd?: number }
 ): void {
   const phase = PHASES.find((p) => p.id === '7.5')!;
   log(phase.name, 'Starting...');
@@ -837,31 +971,69 @@ function runTestVerification(
   }
 
   log(phase.name, 'Running typecheck, lint, build, and tests...');
-  const testResults = runWorkspaceTests(config.workspace_path);
-
-  // Save test results as artifact
   const artifactPath = path.join(artifactsDir, '07b_test_results.md');
-  const failedChecks = testResults.checks.filter((check) => !check.success);
-  const summary = [
-    `- Overall Result: ${testResults.allPassed ? 'PASS' : 'FAIL'}`,
-    `- Passed Checks: ${testResults.checks.length - failedChecks.length}/${testResults.checks.length}`,
-    ...(failedChecks.length > 0
-      ? [`- Failed Checks: ${failedChecks.map((check) => check.name).join(', ')}`]
-      : []),
-  ].join('\n');
-
-  const content = `# Phase 7.5: Test & Verification Results\n\n${summary}\n\n${testResults.report}\n`;
-  fs.writeFileSync(artifactPath, content);
+  const verificationBlocks: VerificationBlock[] = [];
+  let latestResults = runWorkspaceTests(config.workspace_path);
+  verificationBlocks.push({
+    title: 'Initial Verification',
+    result: latestResults,
+  });
+  fs.writeFileSync(artifactPath, renderVerificationArtifact(verificationBlocks) + '\n');
   log(phase.name, `Test results saved: ${artifactPath}`);
 
-  if (!testResults.allPassed) {
-    appendLog(
-      runDir,
-      `Phase 7.5 failed: ${failedChecks.map((check) => check.name).join(', ')}`
-    );
-    throw new Error(
-      `Phase 7.5 failed. Checks failed: ${failedChecks.map((check) => check.name).join(', ')}`
-    );
+  if (!latestResults.allPassed) {
+    for (let attempt = 1; attempt <= MAX_TEST_REPAIR_ATTEMPTS; attempt++) {
+      const failedChecks = latestResults.checks
+        .filter((check) => !check.success)
+        .map((check) => check.name);
+      log(
+        phase.name,
+        `Verification failed (${failedChecks.join(', ')}). Starting repair attempt ${attempt}/${MAX_TEST_REPAIR_ATTEMPTS}...`
+      );
+
+      checkBudget(config, opts.budgetUsd);
+      const repairPrompt = buildTestRepairPrompt(
+        artifactsDir,
+        failedChecks,
+        renderVerificationArtifact(verificationBlocks)
+      );
+      const repairResult = retryAgent(repairPrompt, {
+        cwd: config.workspace_path,
+        maxTurns: 20,
+        permissions: 'read-write',
+        engine: config.engine,
+        timeoutMs: config.timeout_ms,
+      }, `7.5-repair-${attempt}`, runDir);
+      trackCost(config, '7.5', repairResult.costUsd);
+
+      const committed = gitCommitChanges(
+        config.workspace_path,
+        `Pipeline Phase 7.5 - Verification repair attempt ${attempt}`
+      );
+      if (committed) {
+        log(phase.name, `Committed verification repair attempt ${attempt}.`);
+      }
+
+      latestResults = runWorkspaceTests(config.workspace_path);
+      verificationBlocks.push({
+        title: `Repair Attempt ${attempt} Verification`,
+        result: latestResults,
+      });
+      fs.writeFileSync(artifactPath, renderVerificationArtifact(verificationBlocks) + '\n');
+      log(phase.name, `Updated test results saved: ${artifactPath}`);
+
+      if (latestResults.allPassed) {
+        break;
+      }
+    }
+  }
+
+  if (!latestResults.allPassed) {
+    const failedChecks = latestResults.checks
+      .filter((check) => !check.success)
+      .map((check) => check.name);
+    appendLog(runDir, `Phase 7.5 failed after repair attempts: ${failedChecks.join(', ')}`);
+    throw new Error(`Phase 7.5 failed after repair attempts. Checks failed: ${failedChecks.join(', ')}`);
   }
 
   // Commit any test-related changes (e.g., lockfile updates)
@@ -1038,7 +1210,10 @@ async function main(): Promise<void> {
         dryRun: args.dryRun,
       });
     } else if (phase.id === '7.5') {
-      runTestVerification(config, artifactsDir, runDir, { dryRun: args.dryRun });
+      runTestVerification(config, artifactsDir, runDir, {
+        dryRun: args.dryRun,
+        budgetUsd: args.budgetUsd,
+      });
     } else {
       runArtifactPhase(phase, config, artifactsDir, runDir, {
         budgetUsd: args.budgetUsd,

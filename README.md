@@ -211,7 +211,7 @@ The pipeline runs through 9 phases sequentially. Each phase produces a Markdown 
 | 5 | Tech Spec | Detailed technical design referencing actual files and patterns in the repo |
 | 6 | Task Breakdown | Ordered implementation tasks with file targets, acceptance criteria, and dependencies |
 | 7 | Implementation | AI implements each task directly in the repo, committing after each task |
-| 7.5 | Test & Verify | Runs typecheck, lint, build, and test suite against the implemented repo |
+| 7.5 | Test & Verify | Installs dependencies, runs typecheck/lint/build/tests, and auto-attempts repair if checks fail |
 | 8 | Audit | Validates the implementation against the PRD, tech spec, and quality standards |
 
 **Phases 0-3** are artifact generation phases — the AI runs with read-only permissions and produces the next artifact from prior outputs (with web research enabled for grounding).
@@ -222,7 +222,7 @@ The pipeline runs through 9 phases sequentially. Each phase produces a Markdown 
 
 **Phase 7** runs the AI *inside the cloned repo* with full tools (`Edit`, `Write`, `Bash`, `Read`, `Glob`, `Grep`) to implement each task from the breakdown. Each task is committed to git individually. If the run is interrupted, it resumes from the last completed task.
 
-**Phase 7.5** is deterministic — it runs typecheck, lint, build, and tests against the workspace, writes a verification artifact, and fails the pipeline if any check fails.
+**Phase 7.5** is deterministic with bounded repair attempts — it runs dependency install + typecheck/lint/build/tests, writes a verification artifact, and if checks fail it runs up to two AI repair passes that re-test automatically before failing.
 
 ### Interactive Mode
 

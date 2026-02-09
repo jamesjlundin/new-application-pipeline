@@ -1,4 +1,5 @@
 import { execFileSync, execSync } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 
 export interface TestCheckResult {
@@ -12,6 +13,13 @@ export interface WorkspaceTestResult {
   report: string;
   checks: TestCheckResult[];
   allPassed: boolean;
+}
+
+type PackageManager = 'npm' | 'pnpm';
+
+function detectPackageManager(workspacePath: string): PackageManager {
+  if (fs.existsSync(path.join(workspacePath, 'pnpm-lock.yaml'))) return 'pnpm';
+  return 'npm';
 }
 
 export interface RepoConfig {
@@ -131,6 +139,21 @@ export function runWorkspaceTests(
 ): WorkspaceTestResult {
   const sections: string[] = [];
   const checks: TestCheckResult[] = [];
+  const packageManager = detectPackageManager(workspacePath);
+
+  function commandExists(command: string): boolean {
+    try {
+      execSync(`${command} --version`, {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 20_000,
+        stdio: 'pipe',
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function runCheck(name: string, command: string, tailLimit: number = 4000): void {
     try {
@@ -165,10 +188,29 @@ export function runWorkspaceTests(
     }
   }
 
-  runCheck('TypeScript Typecheck', 'npm run typecheck --if-present');
-  runCheck('Lint', 'npm run lint --if-present');
-  runCheck('Build', 'npm run build --if-present');
-  runCheck('Tests', 'npm test --if-present');
+  if (packageManager === 'pnpm') {
+    if (!commandExists('pnpm')) {
+      checks.push({
+        name: 'Dependency Install',
+        command: 'pnpm install --frozen-lockfile',
+        success: false,
+        output: 'pnpm is required but is not installed on PATH.',
+      });
+      sections.push(
+        '## Dependency Install (pnpm install --frozen-lockfile)\n```\npnpm is required but is not installed on PATH.\n```'
+      );
+    } else {
+      runCheck('Dependency Install', 'pnpm install --frozen-lockfile', 5000);
+    }
+  } else {
+    runCheck('Dependency Install', 'npm ci', 5000);
+  }
+
+  const runner = packageManager === 'pnpm' ? 'pnpm' : 'npm';
+  runCheck('TypeScript Typecheck', `${runner} run typecheck --if-present`);
+  runCheck('Lint', `${runner} run lint --if-present`);
+  runCheck('Build', `${runner} run build --if-present`);
+  runCheck('Tests', `${runner} test --if-present`);
 
   return {
     report: sections.join('\n\n') || '(no test results available)',

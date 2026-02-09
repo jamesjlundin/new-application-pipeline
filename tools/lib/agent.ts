@@ -29,6 +29,7 @@ export interface AgentResult {
 interface CodexCapabilities {
   supportsAskForApproval: boolean;
   supportsSearch: boolean;
+  supportsOutputLastMessage: boolean;
 }
 
 let codexCapabilitiesCache: CodexCapabilities | null = null;
@@ -37,20 +38,32 @@ function getCodexCapabilities(): CodexCapabilities {
   if (codexCapabilitiesCache) return codexCapabilitiesCache;
 
   try {
-    const result = spawnSync('codex', ['--help'], {
+    const topLevelHelp = spawnSync('codex', ['--help'], {
       encoding: 'utf-8',
       stdio: 'pipe',
       timeout: 10_000,
     });
-    const helpText = `${result.stdout || ''}\n${result.stderr || ''}`;
+    const execHelp = spawnSync('codex', ['exec', '--help'], {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      timeout: 10_000,
+    });
+    const topHelpText = `${topLevelHelp.stdout || ''}\n${topLevelHelp.stderr || ''}`;
+    const execHelpText = `${execHelp.stdout || ''}\n${execHelp.stderr || ''}`;
     codexCapabilitiesCache = {
       supportsAskForApproval:
-        helpText.includes('--ask-for-approval') || helpText.includes('-a, --ask-for-approval'),
-      supportsSearch: helpText.includes('--search'),
+        topHelpText.includes('--ask-for-approval') || topHelpText.includes('-a, --ask-for-approval'),
+      supportsSearch: topHelpText.includes('--search'),
+      supportsOutputLastMessage:
+        execHelpText.includes('--output-last-message') || execHelpText.includes('-o, --output-last-message'),
     };
   } catch {
     // Conservative defaults when detection fails.
-    codexCapabilitiesCache = { supportsAskForApproval: false, supportsSearch: false };
+    codexCapabilitiesCache = {
+      supportsAskForApproval: false,
+      supportsSearch: false,
+      supportsOutputLastMessage: false,
+    };
   }
 
   return codexCapabilitiesCache;
@@ -79,7 +92,10 @@ function buildClaudeArgs(options: AgentOptions): { cmd: string; args: string[] }
   return { cmd: 'claude', args };
 }
 
-function buildCodexArgs(options: AgentOptions): { cmd: string; args: string[] } {
+function buildCodexArgs(
+  options: AgentOptions,
+  outputLastMessagePath?: string
+): { cmd: string; args: string[] } {
   const { permissions, webSearch } = options;
   const args: string[] = [];
   const capabilities = getCodexCapabilities();
@@ -94,6 +110,9 @@ function buildCodexArgs(options: AgentOptions): { cmd: string; args: string[] } 
   }
 
   args.push('exec', '--json');
+  if (outputLastMessagePath && capabilities.supportsOutputLastMessage) {
+    args.push('--output-last-message', outputLastMessagePath);
+  }
 
   // Sandbox mode based on permissions
   if (permissions === 'read-only') {
@@ -180,17 +199,22 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
   const maxTurns = options.maxTurns || 0;
   const timeoutMs = options.timeoutMs;
 
-  const { cmd, args } = engine === 'codex' ? buildCodexArgs(options) : buildClaudeArgs(options);
+  // Write prompt to secure temp file to avoid shell escaping issues
+  const tmpFile = createSecureTempFile('prompt', '.md');
+  fs.writeFileSync(tmpFile, prompt, { mode: 0o600 });
+  const codexOutputFile = engine === 'codex'
+    ? createSecureTempFile('codex-last-message', '.md')
+    : null;
+
+  const { cmd, args } = engine === 'codex'
+    ? buildCodexArgs(options, codexOutputFile || undefined)
+    : buildClaudeArgs(options);
 
   // Log prompt diagnostics
   const promptBytes = Buffer.byteLength(prompt, 'utf-8');
   const approxTokens = Math.round(promptBytes / 4);
   console.log(`  [agent] Engine: ${engine} | Prompt: ${formatBytes(promptBytes)} (~${approxTokens.toLocaleString()} tokens)`);
   console.log(`  [agent] Timeout: ${timeoutMs ? formatDuration(timeoutMs) : 'none'} | Cmd: ${cmd} ${args.join(' ')}`);
-
-  // Write prompt to secure temp file to avoid shell escaping issues
-  const tmpFile = createSecureTempFile('prompt', '.md');
-  fs.writeFileSync(tmpFile, prompt, { mode: 0o600 });
 
   const startTime = Date.now();
 
@@ -275,7 +299,9 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
       }
       if (event.type === 'item.completed' && event.item) {
         if (event.item.type === 'agent_message') {
-          state.finalText = event.item.text || '';
+          const text = event.item.text || '';
+          accumulatedText += text;
+          state.finalText = accumulatedText;
           state.textBytes = Buffer.byteLength(state.finalText);
         }
         if (event.item.type === 'command_execution') {
@@ -413,6 +439,7 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
   // Track the temp directory for cleanup
   const tmpDir1 = path.dirname(tmpFile);
   const tmpDir2 = path.dirname(wrapperFile);
+  const tmpDir3 = codexOutputFile ? path.dirname(codexOutputFile) : null;
 
   try {
     const result = spawnSync('node', [wrapperFile], {
@@ -462,7 +489,17 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
       throw new Error(`Agent failed after ${elapsed}: ${msg}`);
     }
 
-    const output = (result.stdout || '').trim();
+    let output = (result.stdout || '').trim();
+    if (engine === 'codex' && codexOutputFile && fs.existsSync(codexOutputFile)) {
+      try {
+        const fileOutput = fs.readFileSync(codexOutputFile, 'utf-8').trim();
+        if (fileOutput.length > 0) {
+          output = fileOutput;
+        }
+      } catch {
+        // Fall back to stream-parsed output if reading file fails.
+      }
+    }
 
     if (result.status !== 0 && result.status !== null) {
       if (output.length > 0) {
@@ -478,6 +515,9 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     // Clean up temp files and directories
     try { fs.rmSync(tmpDir1, { recursive: true, force: true }); } catch { /* ignore */ }
     try { fs.rmSync(tmpDir2, { recursive: true, force: true }); } catch { /* ignore */ }
+    if (tmpDir3) {
+      try { fs.rmSync(tmpDir3, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
   }
 }
 
