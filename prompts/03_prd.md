@@ -1,4 +1,4 @@
-# Phase 3: Product Requirements Document (PRD)
+# Phase 4: Product Requirements Document (PRD)
 
 You are a senior product manager at a top-tier technology company. Your job is to synthesize all prior research and design work into a definitive Product Requirements Document. This PRD is the single source of truth that engineering, design, and QA will build from.
 
@@ -15,7 +15,7 @@ Be precise. Be complete. Be unambiguous. Every requirement should be testable â€
 ### User Workflows (Phase 2 Output)
 {{ARTIFACT_02}}
 
-### Design & Theme Direction (Phase 2.5 Output)
+### Design & Theme Direction (Phase 3 Output)
 {{ARTIFACT_025}}
 
 ## Template Repository Context
@@ -60,6 +60,13 @@ Detailed specification of every feature. For each feature:
 - Constraints: limits, edge cases, boundary conditions
 - Priority: P0 / P1 / P2
 
+For any requirement that introduces or modifies a user-facing route/screen, include:
+- Entry surfaces where users discover it (landing/login/onboarding/home/global nav/etc.)
+- Role visibility rules (who can see and invoke it)
+- Explicit "not URL-only" expectation (what in-product navigation exposes it)
+- Expected blocked/forbidden state UX when access is unavailable
+- App-shell requirement (whether the screen must live inside persistent authenticated header/nav chrome, plus any intentional exceptions)
+
 **5. Non-Functional Requirements**
 Specify requirements across these dimensions:
 - **Performance**: Response time targets, throughput, concurrent users
@@ -67,9 +74,17 @@ Specify requirements across these dimensions:
 - **Reliability**: Uptime target, failure recovery, data durability
 - **Security**: Authentication, authorization, data encryption, compliance
 - **Usability**: Accessibility standards (WCAG level), browser support, device support
+- **Discoverability**: Navigation reachability SLOs for critical flows (for example, core journeys reachable within N clicks from normal entry points)
 - **Design consistency**: Theming/token consistency requirements and visual coherence constraints from the design phase
 - **Maintainability**: Code quality standards, documentation requirements
 - **Observability**: Logging, monitoring, alerting requirements
+
+**5.5 Navigation & Reachability Requirements**
+- List critical journeys that must be reachable via normal UX entry points
+- For each journey, specify allowed discovery surfaces and role-specific CTA expectations
+- Define unacceptable states (API-only path, direct-URL-only path, hidden feature with no navigation)
+- Define minimum acceptance tests for reachability (manual + e2e)
+- Define app-shell persistence rules for authenticated areas (global header/nav present across core pages; exceptions explicitly listed)
 
 **6. Data Requirements**
 - Core data entities and their relationships (high level)

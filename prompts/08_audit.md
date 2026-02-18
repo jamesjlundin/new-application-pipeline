@@ -1,4 +1,4 @@
-# Phase 8: Validation & Consistency Audit
+# Phase 12: Validation & Consistency Audit
 
 You are a senior QA engineer and technical auditor. Your job is to verify that the implementation matches the product requirements, technical design, and quality standards. You are the last line of defense before this application is considered complete.
 
@@ -6,16 +6,19 @@ Be thorough and honest. If something is incomplete, say so. If something is wron
 
 ## Inputs
 
-### PRD (Phase 3 Output)
+### User Workflows (Phase 2 Output)
+{{ARTIFACT_02}}
+
+### PRD (Phase 4 Output)
 {{ARTIFACT_03}}
 
-### Tech Spec (Phase 5 Output)
+### Tech Spec (Phase 7 Output)
 {{ARTIFACT_05}}
 
-### Task Breakdown (Phase 6 Output)
+### Task Breakdown (Phase 8 Output)
 {{ARTIFACT_06}}
 
-### Design & Theme Direction (Phase 2.5 Output)
+### Design & Theme Direction (Phase 3 Output)
 {{ARTIFACT_025}}
 
 ### Git Changes Summary
@@ -23,6 +26,9 @@ Be thorough and honest. If something is incomplete, say so. If something is wron
 
 ### Test Results
 {{TEST_RESULTS}}
+
+### UX Reachability Report (Phase 11 Output)
+{{ARTIFACT_07C}}
 
 ## Template Repository Context
 {{TEMPLATE_CONTEXT}}
@@ -71,6 +77,17 @@ Areas to check:
 - Theme token and component styling implementation matches the design/theme artifact
 - Auth implementation matches spec
 - Error handling matches spec
+
+**2A. Discoverability & Branding Coverage**
+- Are primary workflows reachable through normal entry points (landing/login/onboarding/home/global nav)?
+- Are core features accessible via UI navigation vs direct URL/API-only paths?
+- Does dashboard/home provide role-appropriate primary CTAs from PRD/workflows?
+- Do authenticated feature routes preserve persistent app-shell navigation (shared header/nav) so pages are not dead ends?
+- Have template demo/pattern-reference surfaces been removed or intentionally retained?
+- Are base public/auth pages properly rebranded for the app concept?
+- Include specific evidence with file paths/line references.
+- If any P0 journey is URL-only or API-only, mark as launch-blocking and classify as Critical.
+- If authenticated P0 routes lose shared app-shell navigation with no intentional exception, mark as launch-blocking and classify as Critical.
 
 **3. Code Quality Assessment**
 Review the implementation for:
@@ -162,6 +179,8 @@ Categorize all findings:
 - Top 3 strengths of the implementation
 - Top 3 concerns
 - Recommended next actions (prioritized list)
+- Explicitly state whether navigation/reachability for all P0 journeys is acceptable for launch.
+- Explicitly state whether persistent app-shell navigation across authenticated P0 pages is acceptable for launch.
 
 ## Output Format
 

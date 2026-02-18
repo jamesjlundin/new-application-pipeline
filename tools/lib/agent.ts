@@ -15,6 +15,7 @@ export interface AgentOptions {
   webSearch?: boolean;
   engine?: Engine;
   timeoutMs?: number;
+  claudeOutputFormat?: 'stream-json' | 'json';
 }
 
 export interface AgentResult {
@@ -24,6 +25,10 @@ export interface AgentResult {
   outputTokens: number;
   turns: number;
   elapsed: string;
+  stopReason?: string;
+  resultSubtype?: string;
+  outputSource?: string;
+  claudeOutputFormat?: 'stream-json' | 'json';
 }
 
 interface CodexCapabilities {
@@ -71,13 +76,14 @@ function getCodexCapabilities(): CodexCapabilities {
 
 function buildClaudeArgs(options: AgentOptions): { cmd: string; args: string[] } {
   const { maxTurns, permissions, webSearch } = options;
-  const args: string[] = [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--include-partial-messages',
-    '--verbose',
-  ];
+  const outputFormat = options.claudeOutputFormat || 'json';
+  const args: string[] = ['-p', '--output-format', outputFormat];
+
+  // In json mode we prefer deterministic stdout payloads over debug chatter.
+  // Verbose mode can emit extra output that complicates strict JSON parsing.
+  if (outputFormat === 'stream-json') {
+    args.push('--verbose');
+  }
 
   if (maxTurns) args.push('--max-turns', String(maxTurns));
 
@@ -161,7 +167,28 @@ function createSecureTempFile(prefix: string, ext: string): string {
  * Strips preamble before the first markdown heading and trailing commentary.
  */
 export function cleanArtifact(raw: string): string {
-  let content = raw.trim();
+  let content = raw.replace(/\r\n/g, '\n').trim();
+
+  // Prefer explicit artifact envelope when present.
+  const outputEnvelopeMatch = content.match(/<artifact_output>\s*([\s\S]*?)\s*<\/artifact_output>/i);
+  if (outputEnvelopeMatch?.[1]) {
+    content = outputEnvelopeMatch[1].trim();
+  }
+
+  // Prefer explicit artifact tags when present.
+  const artifactTagMatch = content.match(/<artifact[^>]*>\s*([\s\S]*?)\s*<\/artifact>/i);
+  if (artifactTagMatch?.[1]) {
+    content = artifactTagMatch[1].trim();
+  }
+
+  // If output is wrapped in a single markdown fence, unwrap it.
+  const fencedMatches = [...content.matchAll(/```(?:markdown|md)?\n([\s\S]*?)```/gi)];
+  if (fencedMatches.length === 1) {
+    const fencedBody = fencedMatches[0]?.[1]?.trim();
+    if (fencedBody && /^#{1,3}\s/m.test(fencedBody)) {
+      content = fencedBody;
+    }
+  }
 
   // Strip everything before the first markdown heading
   const headingMatch = content.match(/^(#{1,3}\s)/m);
@@ -179,6 +206,9 @@ export function cleanArtifact(raw: string): string {
     content = content.replace(pattern, '');
   }
 
+  // Strip explicit output end marker if present.
+  content = content.replace(/\n?<!--\s*END_ARTIFACT\s*-->\s*$/i, '');
+
   return content.trim();
 }
 
@@ -193,7 +223,7 @@ export function estimateTokens(text: string): number {
  * Runs an AI agent (claude or codex) synchronously.
  *
  * Uses a child Node process wrapper that:
- * - Parses the NDJSON stream (stream-json for Claude, --json for Codex)
+ * - Parses JSON outputs (Claude json/stream-json and Codex --json)
  * - Tracks turns, tool calls, and text output in real time
  * - Streams stderr to console (progress, debug info)
  * - Logs a heartbeat every 30s with turn count, last tool, and output size
@@ -204,6 +234,7 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
   const engine = options.engine || 'claude';
   const maxTurns = options.maxTurns || 0;
   const timeoutMs = options.timeoutMs;
+  const claudeOutputFormat = options.claudeOutputFormat || 'json';
 
   // Write prompt to secure temp file to avoid shell escaping issues
   const tmpFile = createSecureTempFile('prompt', '.md');
@@ -224,7 +255,7 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
 
   const startTime = Date.now();
 
-  // Build a wrapper script that spawns the agent, parses its NDJSON stream,
+  // Build a wrapper script that spawns the agent, parses its JSON stream/output,
   // tracks turns/tools/output, logs heartbeats, and emits final text to stdout.
   // Also outputs a JSON stats line to stderr for the parent to parse.
   const wrapperScript = `
@@ -233,25 +264,156 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
 
     const ENGINE = ${JSON.stringify(engine)};
     const MAX_TURNS = ${maxTurns};
+    const CLAUDE_OUTPUT_FORMAT = ${JSON.stringify(claudeOutputFormat)};
     const START_MS = ${startTime};
     const HEARTBEAT_MS = ${HEARTBEAT_INTERVAL_MS};
 
     // ---------------------------------------------------------------
-    // State tracked from the NDJSON stream
+    // State tracked from the CLI JSON stream/output
     // ---------------------------------------------------------------
     const state = {
       turn: 0,
       lastTool: '',
       textBytes: 0,
       finalText: '',
+      lastAssistantText: '',
+      longestAssistantText: '',
       numTurns: null,
       costUsd: null,
       inputTokens: 0,
       outputTokens: 0,
+      stopReason: '',
+      resultSubtype: '',
     };
 
     // Accumulated text from all assistant messages (fallback if result event missing)
     let accumulatedText = '';
+    let rawStdout = '';
+
+    const ARTIFACT_OPEN = '<artifact_output>';
+    const ARTIFACT_CLOSE = '</artifact_output>';
+    const ARTIFACT_END = '<!-- END_ARTIFACT -->';
+
+    function contains(haystack, needle) {
+      return haystack.toLowerCase().includes(needle.toLowerCase());
+    }
+
+    function scoreClaudeCandidate(text) {
+      const trimmed = (text || '').trim();
+      if (!trimmed) return -1;
+
+      let score = 0;
+      if (contains(trimmed, ARTIFACT_OPEN)) score += 4;
+      if (contains(trimmed, ARTIFACT_CLOSE)) score += 4;
+      if (contains(trimmed, ARTIFACT_END)) score += 8;
+      if (/^#{1,3}\\s/m.test(trimmed)) score += 1;
+      if (trimmed.length > 8192) score += 2;
+      if (trimmed.length === 8192) score -= 1;
+      score += Math.min(Math.floor(trimmed.length / 4096), 5);
+      return score;
+    }
+
+    function selectClaudeOutput() {
+      const rawCandidates = [
+        { source: 'result', text: state.finalText || '' },
+        { source: 'last_assistant', text: state.lastAssistantText || '' },
+        { source: 'longest_assistant', text: state.longestAssistantText || '' },
+        { source: 'accumulated_assistant', text: accumulatedText || '' },
+      ];
+
+      const seen = new Set();
+      let best = { source: 'result', text: state.finalText || '', score: -1 };
+
+      for (const candidate of rawCandidates) {
+        const trimmed = candidate.text.trim();
+        if (!trimmed || seen.has(trimmed)) continue;
+        seen.add(trimmed);
+
+        const score = scoreClaudeCandidate(trimmed);
+        if (
+          score > best.score ||
+          (score === best.score && trimmed.length > best.text.trim().length)
+        ) {
+          best = { source: candidate.source, text: trimmed, score };
+        }
+      }
+
+      return best;
+    }
+
+    function parseClaudeResultPayload(payload) {
+      if (!payload || typeof payload !== 'object') return;
+
+      if (typeof payload.result === 'string') {
+        state.finalText = payload.result;
+        if (state.finalText.trim().length > 0) {
+          state.textBytes = Math.max(state.textBytes, Buffer.byteLength(state.finalText.trim()));
+        }
+      }
+
+      if (payload.num_turns != null) {
+        state.numTurns = payload.num_turns;
+      }
+      if (payload.total_cost_usd != null) {
+        state.costUsd = payload.total_cost_usd;
+      }
+      if (payload.input_tokens != null) {
+        state.inputTokens = payload.input_tokens;
+      }
+      if (payload.output_tokens != null) {
+        state.outputTokens = payload.output_tokens;
+      }
+
+      if (typeof payload.subtype === 'string') {
+        state.resultSubtype = payload.subtype;
+      } else if (typeof payload.result_subtype === 'string') {
+        state.resultSubtype = payload.result_subtype;
+      }
+
+      if (typeof payload.stop_reason === 'string') {
+        state.stopReason = payload.stop_reason;
+      } else if (typeof payload.stopReason === 'string') {
+        state.stopReason = payload.stopReason;
+      }
+    }
+
+    function tryParseJsonPayload(raw) {
+      const trimmed = (raw || '').trim();
+      if (!trimmed) return null;
+
+      // Best case: single JSON object payload.
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        // continue
+      }
+
+      // Fallback: parse last JSON-looking line/object from mixed output.
+      const lines = trimmed.split('\\n').map((line) => line.trim()).filter(Boolean);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        if (!line.startsWith('{')) continue;
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          // continue
+        }
+      }
+
+      // Fallback: parse largest bracketed object in the raw output.
+      const firstBrace = trimmed.indexOf('{');
+      const lastBrace = trimmed.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const candidate = trimmed.slice(firstBrace, lastBrace + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch (e) {
+          // continue
+        }
+      }
+
+      return null;
+    }
 
     // ---------------------------------------------------------------
     // Tool name formatter — shows tool + brief context
@@ -268,44 +430,48 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     }
 
     // ---------------------------------------------------------------
-    // Claude stream-json parser
-    // Events: system, assistant, user, result
+    // Claude parser
+    // Handles stream-json events and json-mode result objects.
     // ---------------------------------------------------------------
-    function appendClaudeText(text) {
-      if (!text) return;
-
-      // Avoid duplicating snapshot-style partial payloads.
-      if (accumulatedText.length === 0) {
-        accumulatedText = text;
-      } else if (text.includes(accumulatedText)) {
-        accumulatedText = text;
-      } else if (!accumulatedText.endsWith(text)) {
-        accumulatedText += text;
-      }
-
-      state.textBytes = Buffer.byteLength(accumulatedText);
-    }
-
     function parseClaude(event) {
+      if (!event || typeof event !== 'object') return;
+
+      // stream-json assistant event
       if (event.type === 'assistant' && event.message && event.message.content) {
         let hasTool = false;
+        let assistantText = '';
         for (const block of event.message.content) {
           if (block.type === 'text') {
-            appendClaudeText(block.text || '');
+            assistantText += block.text || '';
           }
           if (block.type === 'tool_use') {
             hasTool = true;
             state.lastTool = briefTool(block.name, block.input);
           }
         }
+        if (assistantText.trim().length > 0) {
+          const trimmed = assistantText.trim();
+          state.lastAssistantText = trimmed;
+          if (trimmed.length > state.longestAssistantText.length) {
+            state.longestAssistantText = trimmed;
+          }
+          if (trimmed.length > accumulatedText.length) {
+            accumulatedText = trimmed;
+          }
+          state.textBytes = Math.max(state.textBytes, Buffer.byteLength(trimmed));
+        }
         if (hasTool) state.turn++;
       }
+
+      // stream-json final event
       if (event.type === 'result') {
-        state.finalText = event.result || '';
-        state.numTurns = event.num_turns != null ? event.num_turns : null;
-        state.costUsd = event.total_cost_usd != null ? event.total_cost_usd : null;
-        state.inputTokens = event.input_tokens || 0;
-        state.outputTokens = event.output_tokens || 0;
+        parseClaudeResultPayload(event);
+        return;
+      }
+
+      // json mode can emit a single result object (without type)
+      if (!event.type && ('result' in event || 'stop_reason' in event || 'num_turns' in event)) {
+        parseClaudeResultPayload(event);
       }
     }
 
@@ -342,12 +508,14 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     }
 
     // ---------------------------------------------------------------
-    // NDJSON line processor
+    // JSON line processor (for stream-json / codex --json)
     // ---------------------------------------------------------------
     let lineBuffer = '';
 
     function processChunk(data) {
-      lineBuffer += data.toString();
+      const text = data.toString();
+      rawStdout += text;
+      lineBuffer += text;
       const lines = lineBuffer.split('\\n');
       lineBuffer = lines.pop() || '';
       for (const line of lines) {
@@ -416,15 +584,73 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
 
       // Process any remaining buffered data
       if (lineBuffer.trim()) processChunk(lineBuffer + '\\n');
-
-      // Determine final output: prefer result event, fall back to accumulated text
-      let output = state.finalText || accumulatedText;
-      if (ENGINE === 'claude') {
-        if (accumulatedText.length > output.length) {
-          output = accumulatedText;
+      if (ENGINE === 'claude' && state.finalText.trim().length === 0 && CLAUDE_OUTPUT_FORMAT === 'json') {
+        const parsed = tryParseJsonPayload(rawStdout);
+        if (parsed) {
+          parseClaude(parsed);
         }
       }
-      process.stdout.write(output);
+
+      // Determine final output.
+      let output = state.finalText || '';
+      let outputSource = 'result';
+      if (ENGINE === 'claude' && CLAUDE_OUTPUT_FORMAT === 'stream-json') {
+        const selected = selectClaudeOutput();
+        output = selected.text;
+        outputSource = selected.source;
+      } else if (ENGINE === 'claude' && output.trim().length === 0) {
+        output = state.lastAssistantText || state.longestAssistantText || accumulatedText;
+        outputSource = 'assistant_fallback';
+      }
+      if (output.trim().length === 0) {
+        output = accumulatedText;
+        outputSource = 'accumulated_assistant';
+      }
+      if (ENGINE === 'claude' && output.trim().length === 0 && CLAUDE_OUTPUT_FORMAT === 'json') {
+        const rawFallback = rawStdout.trim();
+        if (rawFallback.length > 0) {
+          output = rawFallback;
+          outputSource = 'raw_stdout_fallback';
+        }
+      }
+      if (ENGINE === 'claude') {
+        const resultSize = Buffer.byteLength(state.finalText || '');
+        const selectedSize = Buffer.byteLength(output || '');
+        const subtype = state.resultSubtype || 'n/a';
+        const stopReason = state.stopReason || 'n/a';
+        process.stderr.write(
+          '  [agent] Claude output source: ' +
+            outputSource +
+            ' | format=' +
+            CLAUDE_OUTPUT_FORMAT +
+            ' | result=' +
+            formatSize(resultSize) +
+            ' | selected=' +
+            formatSize(selectedSize) +
+            ' | subtype=' +
+            subtype +
+            ' | stop_reason=' +
+            stopReason +
+            '\\n'
+        );
+        if (
+          CLAUDE_OUTPUT_FORMAT === 'stream-json' &&
+          state.finalText.trim().length > 0 &&
+          output.trim().length > 0 &&
+          state.finalText.trim() !== output.trim()
+        ) {
+          process.stderr.write(
+            '  [agent] Claude mismatch: selected output differs from result payload.\\n'
+          );
+        }
+      }
+      // Write final output synchronously to avoid truncation when exiting quickly.
+      // Large payloads can be partially written if we exit immediately after async writes.
+      try {
+        fs.writeSync(1, output);
+      } catch (err) {
+        process.stderr.write('  [agent] stdout write error: ' + (err && err.message ? err.message : String(err)) + '\\n');
+      }
 
       // Log completion summary to stderr
       const parts = [];
@@ -445,6 +671,10 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
         inputTokens: state.inputTokens,
         outputTokens: state.outputTokens,
         turns: turns,
+        stopReason: state.stopReason || '',
+        resultSubtype: state.resultSubtype || '',
+        outputSource: outputSource,
+        claudeOutputFormat: CLAUDE_OUTPUT_FORMAT,
       });
       process.stderr.write('  [agent-stats] ' + stats + '\\n');
 
@@ -481,6 +711,10 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     let inputTokens = 0;
     let outputTokens = 0;
     let turns = 0;
+    let stopReason = '';
+    let resultSubtype = '';
+    let outputSource = '';
+    let selectedClaudeOutputFormat: 'stream-json' | 'json' | undefined = undefined;
 
     if (result.stderr) {
       for (const line of result.stderr.split('\n')) {
@@ -493,6 +727,10 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
               inputTokens = stats.inputTokens || 0;
               outputTokens = stats.outputTokens || 0;
               turns = stats.turns || 0;
+              stopReason = stats.stopReason || '';
+              resultSubtype = stats.resultSubtype || '';
+              outputSource = stats.outputSource || '';
+              selectedClaudeOutputFormat = stats.claudeOutputFormat || undefined;
             }
           } catch { /* ignore parse errors */ }
         } else {
@@ -529,13 +767,35 @@ export function runAgent(prompt: string, options: AgentOptions = {}): AgentResul
     if (result.status !== 0 && result.status !== null) {
       if (output.length > 0) {
         console.log(`  [agent] Exited with code ${result.status} after ${elapsed}, but has output — using it`);
-        return { output, costUsd, inputTokens, outputTokens, turns, elapsed };
+        return {
+          output,
+          costUsd,
+          inputTokens,
+          outputTokens,
+          turns,
+          elapsed,
+          stopReason,
+          resultSubtype,
+          outputSource,
+          claudeOutputFormat: selectedClaudeOutputFormat,
+        };
       }
       throw new Error(`Agent exited with code ${result.status} after ${elapsed} with no output`);
     }
 
     console.log(`  [agent] Completed in ${elapsed} | Output: ${formatBytes(Buffer.byteLength(output))}`);
-    return { output, costUsd, inputTokens, outputTokens, turns, elapsed };
+    return {
+      output,
+      costUsd,
+      inputTokens,
+      outputTokens,
+      turns,
+      elapsed,
+      stopReason,
+      resultSubtype,
+      outputSource,
+      claudeOutputFormat: selectedClaudeOutputFormat,
+    };
   } finally {
     // Clean up temp files and directories
     try { fs.rmSync(tmpDir1, { recursive: true, force: true }); } catch { /* ignore */ }

@@ -32,6 +32,7 @@ Define the structural organization of the app:
 - URL / route structure (if web app)
 - How different user roles see different things (if applicable)
 - Mental model: how should users think about the app's organization?
+- Persistent app shell strategy (which routes use a shared header/nav and which routes are intentional exceptions)
 
 **2. Primary User Flows**
 For each core user task (3-6 flows), document:
@@ -41,6 +42,10 @@ For each core user task (3-6 flows), document:
 - **Decision points**: Where the user makes choices, and what the options are
 - **Success state**: What the user sees when they complete the flow
 - **Data involved**: What information is displayed, entered, or modified at each step
+- **Reachability path**: Exact click-path from a normal entry surface (landing/login/onboarding/home/global nav)
+- **Role scope**: Which role(s) should be able to discover and execute this flow
+- **Blocked/fallback state**: What the user sees if access is unavailable (forbidden, missing setup, disabled flag)
+- **Cross-flow continuation path**: How the user navigates to a different major area without relying on browser back
 
 Priority flows to cover:
 - First-time user onboarding / setup
@@ -56,6 +61,8 @@ List every distinct screen / view the app needs. For each:
 - Data displayed
 - Actions available to the user
 - Which flows include this screen
+- Primary navigation surface(s) that expose this screen (header/sidebar/home CTA/profile menu/etc.)
+- Shell context (public/authenticated/app shell) and whether persistent header/nav is required
 
 **4. Interaction Patterns**
 Define the repeating interaction patterns used across the app:
@@ -65,6 +72,16 @@ Define the repeating interaction patterns used across the app:
 - Feedback patterns (toasts, modals, inline messages?)
 - Loading patterns (skeletons, spinners, optimistic updates?)
 - Destructive action patterns (confirmation, undo, soft delete?)
+- Navigation discoverability patterns (where primary and secondary CTAs appear for each role)
+
+**4.5 Navigation Reachability Matrix**
+Provide a table mapping each critical flow/destination screen to:
+- Entry point surface (landing/login/onboarding/home/global nav/deep link)
+- Click path (2-5 steps)
+- Expected role visibility
+- Expected empty/blocked state messaging
+- Whether route is reachable without direct URL entry
+- Whether the destination preserves persistent app-shell navigation (or is an intentional exception)
 
 **5. Edge Cases & Error States**
 For each primary flow, document:
@@ -102,7 +119,7 @@ At a conceptual level (not code-level), describe:
 
 ## Output Format
 
-Produce the document in clean Markdown. Use numbered steps for flows. Use tables for screen inventories. Use bullet points for interaction patterns. Be specific enough that an engineer could build from this without needing to ask clarifying UX questions.
+Produce the document in clean Markdown. Use numbered steps for flows. Use tables for screen inventories and the navigation reachability matrix. Use bullet points for interaction patterns. Be specific enough that an engineer could build from this without needing to ask clarifying UX questions.
 
 ## Critical Output Rules
 

@@ -16,14 +16,26 @@ export interface RunConfig {
   default_branch: string;
   visibility: 'public' | 'private';
   engine: 'claude' | 'codex';
+  claude_output_format?: 'stream-json' | 'json';
+  interactive_mode?: boolean;
   timeout_ms?: number;
   current_phase: string;
   completed_phases: string[];
   // Cost tracking
   total_cost_usd?: number;
   phase_costs?: Record<string, number>;
-  // Task-level checkpointing for Phase 7
+  total_actual_cost_usd?: number;
+  total_estimated_cost_usd?: number;
+  phase_costs_actual?: Record<string, number>;
+  phase_costs_estimated?: Record<string, number>;
+  total_input_tokens?: number;
+  total_output_tokens?: number;
+  // Task-level checkpointing for Phase 9
   last_completed_task?: number;
+  task_decomposition_events?: number;
+  dynamic_tasks_added?: number;
+  // Stage-level checkpointing for Phase 10 (10A integration, 10B e2e)
+  phase10_completed_stages?: Array<'10A' | '10B'>;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,17 +46,18 @@ const ARTIFACT_FILES: Record<string, string> = {
   '0': '00_idea_intake.md',
   '1': '01_problem_framing.md',
   '2': '02_workflows.md',
-  '2.5': '02b_design_theme.md',
-  '3': '03_prd.md',
-  '3.5': '03b_repo_baseline.md',
-  '4': '04_feasibility_review.md',
-  '5': '05_tech_spec.md',
-  '6': '06_task_breakdown.md',
-  '7.5': '07b_test_results.md',
-  '8': '08_audit.md',
+  '3': '02b_design_theme.md',
+  '4': '03_prd.md',
+  '5': '03b_repo_baseline.md',
+  '6': '04_feasibility_review.md',
+  '7': '05_tech_spec.md',
+  '8': '06_task_breakdown.md',
+  '10': '07b_test_results.md',
+  '11': '07c_ux_reachability.md',
+  '12': '08_audit.md',
 };
 
-const VALID_PHASE_IDS = new Set(['0', '1', '2', '2.5', '3', '3.5', '4', '5', '6', '7', '7.5', '8']);
+const VALID_PHASE_IDS = new Set(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
 
 // ---------------------------------------------------------------------------
 // Artifact Validation
@@ -75,20 +88,39 @@ export function validateArtifactsExist(artifactsDir: string, phases: string[]): 
 const REQUIRED_SECTIONS: Record<string, string[]> = {
   '0': ['App Name', 'One-Line Description', 'Problem Statement', 'Target Users', 'Core Features'],
   '1': ['Problem Decomposition', 'User Personas', 'Pain Points', 'Core Value Proposition'],
-  '2': ['Information Architecture', 'Primary User Flows', 'Screen Inventory'],
-  '2.5': ['Visual Direction', 'Color System', 'Typography System', 'Theme Tokens'],
-  '3': ['Executive Summary', 'User Stories', 'Functional Requirements', 'Non-Functional Requirements'],
-  '4': ['Template Fit Assessment', 'Technical Risks', 'Go / No-Go'],
-  '5': ['Architecture Overview', 'Data Model', 'API Design', 'Security Considerations'],
-  '6': ['Implementation Milestones', 'Task List', 'Dependency Graph'],
-  '8': ['Requirements Coverage', 'Security Review', 'Overall Assessment'],
+  '2': ['Information Architecture', 'Primary User Flows', 'Screen Inventory', 'Navigation Reachability Matrix'],
+  '3': ['Visual Direction', 'Color System', 'Typography System', 'Theme Tokens'],
+  '4': ['Executive Summary', 'User Stories', 'Functional Requirements', 'Non-Functional Requirements', 'Navigation & Reachability Requirements'],
+  '6': ['Template Fit Assessment', 'Technical Risks', 'Go / No-Go'],
+  '7': ['Architecture Overview', 'Data Model', 'API Design', 'Route-to-Screen Traceability Matrix', 'Security Considerations'],
+  '8': ['Implementation Milestones', 'Task List', 'Routing Coverage Matrix', 'Navigation Reachability Task Matrix', 'Template Demo Removal & Rebranding', 'Dependency Graph'],
+  '11': ['Journey Coverage Summary', 'Discoverability Findings', 'Branding Findings', 'Reachability Verdict'],
+  '12': ['Requirements Coverage', 'Discoverability & Branding Coverage', 'Security Review', 'Overall Assessment'],
 };
+
+function hasRequiredSection(content: string, section: string): boolean {
+  const lowered = content.toLowerCase();
+  if (lowered.includes(section.toLowerCase())) {
+    return true;
+  }
+
+  // Accept common heading spelling variants to reduce false negatives.
+  if (section === 'Non-Functional Requirements') {
+    return /non[-\s]?functional requirements/i.test(content);
+  }
+  if (section === 'Go / No-Go') {
+    return /go\s*\/?\s*no[-\s]?go/i.test(content);
+  }
+
+  return false;
+}
 
 export function validateArtifactContent(phaseId: string, content: string): string[] {
   const warnings: string[] = [];
+  const trimmed = content.trim();
 
   // Minimum size check
-  if (content.length < 500) {
+  if (trimmed.length < 500) {
     warnings.push(`Artifact for phase ${phaseId} is suspiciously small (${content.length} chars). May be an error message rather than a real artifact.`);
   }
 
@@ -104,17 +136,32 @@ export function validateArtifactContent(phaseId: string, content: string): strin
     /permission to (save|write|create)/i,
   ];
   for (const pattern of metaPatterns) {
-    if (pattern.test(content.slice(0, 200))) {
+    if (pattern.test(trimmed.slice(0, 350))) {
       warnings.push(`Phase ${phaseId}: Artifact appears to start with AI meta-commentary. Content may need cleaning.`);
       break;
     }
+  }
+
+  // Ensure artifact has markdown structure
+  const hasHeading = /^#{1,3}\s/m.test(trimmed);
+  if (!hasHeading) {
+    warnings.push(`Phase ${phaseId}: Artifact contains no markdown headings.`);
+  }
+
+  // Heuristic truncation check: abruptly cut trailing token
+  if (
+    trimmed.length > 0 &&
+    /[a-zA-Z0-9]$/.test(trimmed) &&
+    !/[.!?`)"'\]}:;]$/.test(trimmed)
+  ) {
+    warnings.push(`Phase ${phaseId}: Artifact appears truncated at the end.`);
   }
 
   // Check required sections
   const required = REQUIRED_SECTIONS[phaseId];
   if (required) {
     for (const section of required) {
-      if (!content.toLowerCase().includes(section.toLowerCase())) {
+      if (!hasRequiredSection(content, section)) {
         warnings.push(`Phase ${phaseId}: Missing expected section "${section}"`);
       }
     }
@@ -207,6 +254,13 @@ export function validateConfig(config: RunConfig): void {
 
   if (config.engine && !['claude', 'codex'].includes(config.engine)) {
     errors.push('engine must be "claude" or "codex"');
+  }
+
+  if (
+    config.claude_output_format &&
+    !['stream-json', 'json'].includes(config.claude_output_format)
+  ) {
+    errors.push('claude_output_format must be "stream-json" or "json"');
   }
 
   try {

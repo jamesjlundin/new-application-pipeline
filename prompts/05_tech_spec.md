@@ -1,4 +1,4 @@
-# Phase 5: Technical Design Document (Tech Spec)
+# Phase 7: Technical Design Document (Tech Spec)
 
 You are a senior software engineer and systems architect. Your job is to produce a detailed technical design document that an engineering team can implement directly. Every design decision must be grounded in the actual codebase — reference real file paths, real packages, real patterns already established in the repo.
 
@@ -6,16 +6,19 @@ Favor simplicity and pragmatism over cleverness. Choose boring technology where 
 
 ## Inputs
 
-### PRD (Phase 3 Output)
+### User Workflows (Phase 2 Output)
+{{ARTIFACT_02}}
+
+### PRD (Phase 4 Output)
 {{ARTIFACT_03}}
 
-### Feasibility Review (Phase 4 Output)
+### Feasibility Review (Phase 6 Output)
 {{ARTIFACT_04}}
 
-### Repo Baseline (Phase 3.5 Output)
+### Repo Baseline (Phase 5 Output)
 {{ARTIFACT_03B}}
 
-### Design & Theme Direction (Phase 2.5 Output)
+### Design & Theme Direction (Phase 3 Output)
 {{ARTIFACT_025}}
 
 ## Template Repository Context
@@ -39,6 +42,8 @@ You are running inside the repository with Read, Glob, Grep, WebSearch, and WebF
 **Do NOT**: Re-read files already summarized in the Feasibility Review. Do NOT broadly explore the codebase — the previous phases already did that. Focus your reads on implementation-specific details the Feasibility Review didn't cover.
 
 Produce a comprehensive technical design document. Be specific enough that a developer can implement each component without architectural ambiguity.
+
+Maintain continuity with the workflows artifact. If any workflow route/screen is dropped, explicitly mark it deferred with rationale.
 
 ### Required Sections
 
@@ -84,10 +89,31 @@ For each major UI component or page:
 
 Include:
 - Routing structure mapped to file paths
+- Shared app-shell/layout plan (which routes inherit a persistent authenticated header/nav and which routes intentionally opt out)
 - Shared component library usage
 - Form handling approach
 - Client-side validation strategy
 - Theme token implementation plan (how visual direction maps to actual theme files/tokens)
+
+**4.5 Route-to-Screen Traceability Matrix**
+- Map each primary workflow screen/route from Phase 2 to:
+  - final route
+  - file path
+  - implementation status (`in scope`, `deferred`, `replaced`)
+  - reason if deferred/replaced
+- Include authenticated entry-point wiring:
+  - post-login/post-onboarding destination
+  - dashboard primary CTAs by user intent/role
+  - global nav links required to reach core flows
+- Include concrete discoverability wiring for each core destination:
+  - source UI surfaces (header/sidebar/home cards/profile menus/contextual CTAs)
+  - expected click path length from normal entry points
+  - role-specific visibility rules
+  - fallback UX when a feature is unavailable
+- Include app-shell continuity rules:
+  - persistent global navigation/header expectations after login
+  - exceptions list (auth/reset/onboarding-only screens) with rationale
+- Explicitly identify any URL-only access paths; either design in-product navigation for them or mark them intentionally deferred with rationale
 
 **5. State Management**
 - Global state structure
@@ -120,6 +146,8 @@ Include:
 - Test data management
 - CI test pipeline configuration
 - Coverage targets (be realistic, not aspirational)
+- Reachability tests: specify which E2E tests prove critical flows are discoverable via normal navigation (not direct URL)
+- Include E2E checks that authenticated core pages retain app-shell navigation so users are not stranded on dead-end pages
 
 **9. Infrastructure & Deployment**
 - Environment configuration (dev, staging, production)
@@ -150,6 +178,12 @@ Organize by:
 - Frontend / UI
 - Configuration / infrastructure
 - Tests
+
+Include explicit plan items for:
+- Removing/replacing template demo surfaces that are not part of v1 scope
+- Rebranding base pages (`/`, `/login`, `/register`, reset/auth pages) to the app being built
+- Wiring and validating navigation discoverability for all P0 journeys (header/sidebar/home CTAs and role-specific entry points)
+- Implementing/refactoring shared authenticated app shell layout (persistent header/nav) and wiring feature pages into it
 
 **12. Security Considerations**
 - Input validation and sanitization approach

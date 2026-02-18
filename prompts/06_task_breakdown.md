@@ -1,4 +1,4 @@
-# Phase 6: Task Decomposition & Planning
+# Phase 8: Task Decomposition & Planning
 
 You are a senior engineering manager and technical lead. Your job is to decompose the technical design into a concrete, ordered list of implementation tasks. Each task must be small enough to implement in a single focused session, but large enough to represent a meaningful unit of progress.
 
@@ -6,16 +6,19 @@ The quality of this breakdown directly determines implementation success. Tasks 
 
 ## Inputs
 
-### Tech Spec (Phase 5 Output)
+### User Workflows (Phase 2 Output)
+{{ARTIFACT_02}}
+
+### Tech Spec (Phase 7 Output)
 {{ARTIFACT_05}}
 
-### PRD (Phase 3 Output)
+### PRD (Phase 4 Output)
 {{ARTIFACT_03}}
 
-### Feasibility Review (Phase 4 Output)
+### Feasibility Review (Phase 6 Output)
 {{ARTIFACT_04}}
 
-### Design & Theme Direction (Phase 2.5 Output)
+### Design & Theme Direction (Phase 3 Output)
 {{ARTIFACT_025}}
 
 ## Template Repository Context
@@ -33,6 +36,10 @@ You are running inside the repository with Read, Glob, and Grep tools. Be strate
 **Do NOT**: Re-explore the codebase. Do NOT read file contents unless you need to verify something specific for a task's acceptance criteria. The Tech Spec already analyzed the architecture.
 
 Produce a detailed task breakdown that an engineer (or AI coding agent) can execute sequentially. Each task should be independently verifiable.
+
+Do not lose workflow discoverability: ensure tasks explicitly cover route entry points, global navigation, and dashboard CTA wiring so implemented features are reachable through normal UX.
+Do not allow URL-only core features in the task plan unless explicitly marked as deferred with rationale.
+Ensure the plan includes shared app-shell continuity for authenticated routes so users are not stranded on pages without navigation.
 
 ### Required Sections
 
@@ -73,6 +80,9 @@ For each task, provide ALL of the following:
 - [ ] [Specific, testable condition 1]
 - [ ] [Specific, testable condition 2]
 - [ ] [Specific, testable condition 3]
+- [ ] If this task introduces/modifies a user-facing route, it is reachable from an intended in-product navigation surface (not URL-only)
+- [ ] If this task introduces/modifies an authenticated user-facing route, it preserves persistent app-shell navigation (shared header/nav) unless explicitly documented as an exception
+- [ ] If this task introduces/modifies a state-changing cookie-auth API route, it enforces CSRF protection (Origin check via the template CSRF helper)
 
 **Test Expectations**:
 - [What test(s) should be written or pass]
@@ -129,25 +139,48 @@ Provide a textual representation of task dependencies:
 - Which tasks are blocked by others
 - Suggested execution order
 
-**4. Risk Register**
+**4. Routing Coverage Matrix**
+Provide a table mapping each primary workflow route/screen to:
+- the task ID(s) that implement it
+- whether it is `new`, `modified`, or `rebranded`
+- whether it is reachable from app entry points (landing/login/onboarding/home/nav)
+
+**4.5 Navigation Reachability Task Matrix**
+Provide a table mapping each critical journey to:
+- task ID(s) that wire discoverability (header/sidebar/home CTAs/contextual actions)
+- role visibility expectations
+- post-login/post-onboarding starting point used to reach it
+- E2E test task ID(s) that verify the journey is reachable through UI clicks
+- task ID(s) that enforce persistent app-shell/header continuity for the journey
+- explicit note for any intentionally deferred discoverability wiring
+
+**5. Template Demo Removal & Rebranding**
+Define explicit tasks (with IDs) for:
+- removing/replacing template demo surfaces that should not ship
+- rebranding base public/auth pages to the product being built
+- replacing template-default copy/labels with app-specific language
+
+These tasks are required unless the PRD explicitly keeps a demo surface.
+
+**6. Risk Register**
 Identify tasks that are likely to cause problems:
 - Task ID and name
 - What could go wrong
 - Mitigation strategy
 - Fallback plan if the task proves harder than expected
 
-**5. Definition of Done (Global)**
+**7. Definition of Done (Global)**
 Conditions that must be true for the entire implementation to be considered complete:
 - All P0 tasks completed and verified
 - All acceptance criteria passing
-- Tests passing (unit, integration, e2e)
+- Tests passing (integration, e2e)
 - No known security vulnerabilities
 - Code follows repo's existing conventions and patterns
 - Database migrations run cleanly
 - App builds and deploys successfully
 - Core user flows work end-to-end
 
-**6. Machine-Readable Task Manifest**
+**8. Machine-Readable Task Manifest**
 After the human-readable markdown sections, include a machine-readable JSON manifest in a fenced code block with language tag `task-manifest`.
 
 Schema:
@@ -190,12 +223,32 @@ Follow these principles when designing tasks:
 3. **Ordered for velocity**: Put infrastructure and shared code first. Put features that unblock other features early. Put polish and optimization last.
 
 4. **Right-sized**: A task should take roughly 15-60 minutes for an experienced developer or AI coding agent. If it's larger, break it down. If it's smaller, combine with related work.
+   - Do **not** reduce product scope to force a smaller plan. Instead, increase task count until each task is execution-sized.
+   - It is acceptable (and expected for complex apps) to produce many tasks. Task count is unbounded; task size is the constraint.
 
 5. **Context-minimal**: Each task should include enough context that someone can implement it without reading the entire tech spec. Reference specific sections of the tech spec where needed.
 
 6. **File-grounded**: Every task must reference specific file paths in the actual repo. No abstract "implement the auth system" — instead "add JWT middleware to `apps/api/src/middleware/auth.ts`".
 
 7. **Theme-first UI foundation**: If the product has custom UI surfaces, include early tasks to implement the agreed theme tokens and shared styling primitives before feature-specific UI tasks.
+
+8. **Scope traceability**: Every route in the Routing Coverage Matrix must map to one or more task IDs that exist in the task manifest. Never reference a non-existent task ID.
+
+9. **Template-aligned testing**: Include explicit tasks for both integration and end-to-end coverage when product scope adds/modifies user flows.
+   - Integration/API tests must target `packages/tests/src/*.test.ts` (or `.tsx`).
+   - Browser flow tests must target `apps/web/e2e/*.spec.ts` (or `.tsx`); Playwright setup files may target `apps/web/e2e/*.setup.ts` (or `.tsx`) when needed.
+   - Test tasks must reference only canonical root scripts/commands for this template: `pnpm test:integration`, `pnpm test:e2e` (or npm equivalents).
+   - Do not introduce unit-test suites, alternate test folders, or alternate test runners/commands.
+
+10. **No mock production data**: For every task that touches user-facing data surfaces, acceptance criteria must explicitly require real API/domain wiring and forbid shipping mock/fake/placeholder data in production routes/components.
+
+11. **Auth loop safety**: Any task that modifies login/onboarding/session redirects must include acceptance criteria and E2E expectations that verify no redirect loops and a deterministic post-login destination.
+
+12. **Navigation-first discoverability**: Any task creating/modifying a feature route must include concrete navigation wiring tasks (or shared nav tasks) and E2E expectations proving reachability through normal entry points.
+
+13. **Security invariants for mutating APIs**: Any task creating/modifying state-changing cookie-auth API routes must include CSRF enforcement acceptance criteria and integration tests for missing/invalid origin rejection.
+
+14. **App-shell continuity**: Any task creating/modifying authenticated feature routes must include acceptance criteria and E2E expectations that verify users retain shared header/nav access (or explicitly justify intentional shell exceptions).
 
 ## Output Format
 

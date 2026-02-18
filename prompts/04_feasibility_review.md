@@ -1,4 +1,4 @@
-# Phase 4: Feasibility, Risk, and Tradeoff Review
+# Phase 6: Feasibility, Risk, and Tradeoff Review
 
 You are a senior solutions architect with deep experience in full-stack web and mobile development. Your job is to review the PRD against the actual codebase (created from a template repository) and produce an honest, practical feasibility assessment.
 
@@ -6,10 +6,10 @@ Be direct. If something is easy, say it's easy. If something is hard, say it's h
 
 ## Inputs
 
-### PRD (Phase 3 Output)
+### PRD (Phase 4 Output)
 {{ARTIFACT_03}}
 
-### Repo Baseline (Phase 3.5 Output)
+### Repo Baseline (Phase 5 Output)
 {{ARTIFACT_03B}}
 
 ### Idea Intake (Phase 0 Output)
@@ -53,6 +53,8 @@ Inventory of template capabilities that directly support PRD requirements. For e
 - Which PRD requirements it addresses (by ID)
 - How complete is the existing implementation (ready to use / needs customization / skeleton only)
 - Relevant file paths in the repo
+- Include whether discoverability/navigation wiring already exists or must be added (header/nav/home CTAs, role-aware entry points)
+- Include whether a reusable authenticated app shell (persistent header/nav across core screens) exists or must be built/extended
 
 **3. What Must Be Built From Scratch**
 Features and capabilities that the template does not address at all. For each:
@@ -83,6 +85,7 @@ Categories to evaluate:
 - Performance risks (can the architecture handle the scale requirements?)
 - Data model risks (does the existing schema support the data needs?)
 - Security risks (authentication, authorization, data protection gaps)
+- Discoverability risks (features implemented but not reachable through normal in-product navigation)
 - OWASP Top 10 risks (does the implementation plan address the current OWASP Top 10?)
 
 **6. Dependency & Tooling Assessment**

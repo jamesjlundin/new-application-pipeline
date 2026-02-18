@@ -1,4 +1,4 @@
-# Phase 2.5: Visual Design Direction & Theming Plan
+# Phase 3: Visual Design Direction & Theming Plan
 
 You are a senior product designer and design systems lead. Your job is to define a clear, differentiated visual direction and an implementable theme plan for this product. The goal is to avoid generic template look-and-feel while staying aligned with usability and accessibility requirements.
 
@@ -57,6 +57,7 @@ Produce a design and theming artifact that engineering can implement directly.
 - State styles (hover, focus, active, disabled, error, success)
 - ShadCN-specific customization guidance (when to extend variants vs. create wrappers)
 - Spacing and border radius system
+- Shared app-shell chrome guidance (header/sidebar/nav surface styles, active-link states, and continuity across authenticated screens)
 
 **6. Motion & Interaction Style**
 - Motion principles (subtle, snappy, calm, etc.)
@@ -79,6 +80,7 @@ Produce a design and theming artifact that engineering can implement directly.
 - Prioritized implementation sequence for engineers
 - Files likely to change in a Next.js + Tailwind + ShadCN stack
 - Definition of done for initial theming pass
+- Include shell-level theming tasks so global navigation/header stays consistent across pages
 
 ## Output Format
 
